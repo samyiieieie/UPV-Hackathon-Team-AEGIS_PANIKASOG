@@ -1,0 +1,62 @@
+name: panikasog
+description: Community disaster response app – PANIKASOG
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.1.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.2
+
+  # Firebase (latest stable versions)
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.7.0
+  cloud_firestore: ^5.6.12
+  firebase_storage: ^12.4.10
+  google_sign_in: ^6.3.0
+
+  # Navigation & UI
+  go_router: ^14.8.1
+  percent_indicator: ^4.2.3
+
+  # Maps & Location
+  google_maps_flutter: ^2.12.0
+  geolocator: ^14.0.2
+  geocoding: ^4.0.0
+
+  # Media
+  image_picker: ^1.1.2
+  cached_network_image: ^3.4.1
+
+  # Utils
+  intl: ^0.20.1
+  uuid: ^4.5.1
+  shared_preferences: ^2.5.2
+  flutter_svg: ^2.0.10+1
+  font_awesome_flutter: ^10.8.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
+  # fonts:
+  #   - family: Poppins
+  #     fonts:
+  #       - asset: assets/fonts/Poppins-Regular.ttf
+  #       - asset: assets/fonts/Poppins-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Poppins-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Poppins-Bold.ttf
+  #         weight: 700

@@ -1,0 +1,87 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // Flutter plugin applied via settings.gradle flutter-plugin-loader
+    id "dev.flutter.flutter-gradle-plugin"
+    // Firebase — uncomment after running: flutterfire configure
+    // id "com.google.gms.google-services"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+android {
+    namespace "com.panikasog.app"
+    compileSdk 36
+    ndkVersion flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    lint {
+        disable 'MissingDimensionActivityCreator'
+    }
+    
+    packagingOptions {
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        applicationId "com.panikasog.app"
+        // Must be 21+ for Firebase Auth
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            // TODO: Add signing config for production release
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'androidx.multidex:multidex:2.0.1'
+    // Firebase BoM — manages all Firebase library versions
+    // implementation platform('com.google.firebase:firebase-bom:32.7.0')
+    // implementation 'com.google.firebase:firebase-analytics'
+}

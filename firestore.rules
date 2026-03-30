@@ -1,0 +1,111 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function isValidUserWrite() {
+      let incoming = request.resource.data;
+      return incoming.keys().hasAll(['email', 'name', 'username', 'dateJoined'])
+        && incoming.email is string
+        && incoming.name is string
+        && incoming.username is string;
+    }
+
+    // ── Users ───────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Anyone signed-in can read public profiles (for leaderboard, mentions)
+      allow read: if isSignedIn();
+
+      // Only the owner can create/update their own profile
+      allow create: if isOwner(userId) && isValidUserWrite();
+      allow update: if isOwner(userId);
+
+      // No deletes from client
+      allow delete: if false;
+    }
+
+    // ── Tasks ───────────────────────────────────────────────────────────────
+    match /tasks/{taskId} {
+      // All authenticated users can read tasks
+      allow read: if isSignedIn();
+
+      // Authenticated users can create tasks
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      // Only the task creator can update/delete
+      allow update: if isSignedIn()
+        && resource.data.createdBy == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.createdBy == request.auth.uid;
+    }
+
+    // ── Task Acceptances (sub-collection) ───────────────────────────────────
+    match /tasks/{taskId}/acceptances/{acceptanceId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ── Reports ─────────────────────────────────────────────────────────────
+    match /reports/{reportId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.reportedBy == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.reportedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ── Posts (Home Feed) ───────────────────────────────────────────────────
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.authorId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.authorId == request.auth.uid;
+
+      // Votes sub-collection
+      match /votes/{voteId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn()
+          && voteId == request.auth.uid;
+      }
+    }
+
+    // ── Leaderboard (read-only from client, written by Cloud Functions) ─────
+    match /leaderboard/{entryId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Updated by Cloud Functions only
+    }
+
+    // ── Rewards ─────────────────────────────────────────────────────────────
+    match /rewards/{rewardId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Admin/CF only
+    }
+
+    // ── Reward Claims ────────────────────────────────────────────────────────
+    match /rewardClaims/{claimId} {
+      allow read: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

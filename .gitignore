@@ -1,0 +1,57 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+*.iml
+*.ipr
+*.iws
+
+# Firebase (NEVER commit real keys)
+lib/firebase_options.dart
+google-services.json
+GoogleService-Info.plist
+.env
+*.env.local
+
+# Android
+android/local.properties
+android/.gradle
+android/captures/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/key.properties
+*.keystore
+*.jks
+
+# iOS
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Generated.xcconfig
+ios/Pods/
+ios/.symlinks/
+ios/Runner/GoogleService-Info.plist
+
+# macOS
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/ephemeral/
+
+# VS Code
+.vscode/
+.history/
+*.vsix
+
+# IntelliJ/Android Studio
+.idea/
+*.class
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+lcov.info
