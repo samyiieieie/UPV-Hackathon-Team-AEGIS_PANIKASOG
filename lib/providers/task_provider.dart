@@ -47,8 +47,14 @@ class TaskProvider extends ChangeNotifier {
 
   // ─── Accept Task ───────────────────────────────────────────────────────────
   Future<bool> acceptTask(String taskId, String userId) async {
+    // Ensure tasks are loaded
+    if (_tasks.isEmpty) {
+      await loadTasks();
+    }
+    
     final idx = _tasks.indexWhere((t) => t.id == taskId);
     if (idx == -1) return false;
+    
     _tasks[idx] = _tasks[idx].copyWith(
       status: TaskStatus.accepted,
       acceptedBy: userId,
