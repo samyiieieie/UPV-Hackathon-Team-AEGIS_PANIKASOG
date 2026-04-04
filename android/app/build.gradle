@@ -4,7 +4,7 @@ plugins {
     // Flutter plugin applied via settings.gradle flutter-plugin-loader
     id "dev.flutter.flutter-gradle-plugin"
     // Firebase — uncomment after running: flutterfire configure
-    // id "com.google.gms.google-services"
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
@@ -23,6 +23,13 @@ if (flutterVersionCode == null) {
 def flutterVersionName = localProperties.getProperty('flutter.versionName')
 if (flutterVersionName == null) {
     flutterVersionName = '1.0'
+}
+
+// for release keystore
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -55,7 +62,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.panikasog.app"
+        applicationId "com.example.panikasog"
         // Must be 21+ for Firebase Auth
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
@@ -64,10 +71,20 @@ android {
         multiDexEnabled true
     }
 
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties.getProperty('keyAlias')
+            keyPassword keystoreProperties.getProperty('keyPassword')
+            storeFile keystoreProperties.getProperty('storeFile') ? file(keystoreProperties.getProperty('storeFile')) : null
+            storePassword keystoreProperties.getProperty('storePassword')
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add signing config for production release
-            signingConfig signingConfigs.debug
+            // DONE: Add signing config for production release
+            // signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
         }
@@ -85,3 +102,4 @@ dependencies {
     // implementation platform('com.google.firebase:firebase-bom:32.7.0')
     // implementation 'com.google.firebase:firebase-analytics'
 }
+
