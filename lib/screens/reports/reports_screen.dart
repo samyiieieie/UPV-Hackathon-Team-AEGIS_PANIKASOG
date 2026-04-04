@@ -121,9 +121,29 @@ class _MapView extends StatelessWidget {
 }
 
 // ─── List view ─────────────────────────────────────────────────────────────────
-class _ListView extends StatelessWidget {
+class _ListView extends StatefulWidget {
   final List<ReportModel> reports;
   const _ListView({required this.reports});
+
+  @override
+  State<_ListView> createState() => _ListViewState();
+}
+
+class _ListViewState extends State<_ListView> {
+  String _selectedFilter = 'All';
+
+  List<ReportModel> get _filtered {
+    switch (_selectedFilter) {
+      case 'Verified':
+        return widget.reports.where((r) => r.status == ReportStatus.verified).toList();
+      case 'Pending':
+        return widget.reports.where((r) => r.status == ReportStatus.pending).toList();
+      case 'Resolved':
+        return widget.reports.where((r) => r.status == ReportStatus.resolved).toList();
+      default:
+        return widget.reports;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,18 +156,21 @@ class _ListView extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: ['All', 'Verified', 'Pending', 'Resolved'].map((label) {
-            return Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: label == 'All' ? AppColors.primary : AppColors.lightGrey,
-                borderRadius: BorderRadius.circular(20),
+            final isSelected = label == _selectedFilter; // ← dynamic
+            return GestureDetector(
+              onTap: () => setState(() => _selectedFilter = label), // ← on tap
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : AppColors.lightGrey,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(label,
+                    style: AppTextStyles.bodySmall.copyWith(
+                        color: isSelected ? AppColors.white : AppColors.textGrey,
+                        fontWeight: FontWeight.w500)),
               ),
-              child: Text(label,
-                  style: AppTextStyles.bodySmall.copyWith(
-                      color:
-                          label == 'All' ? AppColors.white : AppColors.textGrey,
-                      fontWeight: FontWeight.w500)),
             );
           }).toList(),
         ),
@@ -155,8 +178,8 @@ class _ListView extends StatelessWidget {
       Expanded(
         child: ListView.builder(
           padding: const EdgeInsets.all(12),
-          itemCount: reports.length,
-          itemBuilder: (_, i) => _ReportCard(report: reports[i]),
+          itemCount: _filtered.length,        // ← use filtered
+          itemBuilder: (_, i) => _ReportCard(report: _filtered[i]), // ← use filtered
         ),
       ),
     ]);
