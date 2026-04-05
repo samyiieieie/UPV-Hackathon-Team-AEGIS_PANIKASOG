@@ -9,24 +9,22 @@ class AuthService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // ─── Stream ───────────────────────────────────────────────────────────────
   Stream<User?> get authStateChanges => _auth.authStateChanges();
-
   User? get currentFirebaseUser => _auth.currentUser;
 
-  // ─── Email / Password Sign-Up ─────────────────────────────────────────────
   Future<UserModel> signUpWithEmail({
     required String email,
     required String password,
     required String phoneNumber,
-    required String name,
+    required String firstName,
+    required String lastName,
     required String username,
     required String address,
     required List<String> skills,
     required List<String> preferredTasks,
     String? usedReferralCode,
   }) async {
-    // 1. Check username uniqueness
+    // Check username uniqueness
     final usernameSnap = await _db
         .collection('users')
         .where('username', isEqualTo: username)
@@ -39,18 +37,15 @@ class AuthService {
       );
     }
 
-    // 2. Create Firebase Auth user
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
     final user = credential.user!;
-    await user.updateDisplayName(name);
+    await user.updateDisplayName('$firstName $lastName');
 
-    // 3. Generate unique referral code
     final referralCode = _generateReferralCode(user.uid);
 
-    // 4. Handle referral bonus
     int bonusPoints = 0;
     String? validatedReferral;
     if (usedReferralCode != null && usedReferralCode.isNotEmpty) {
@@ -62,19 +57,18 @@ class AuthService {
       if (referrerSnap.docs.isNotEmpty) {
         validatedReferral = usedReferralCode;
         bonusPoints = 100;
-        // Give referrer their 100 pts
         await referrerSnap.docs.first.reference.update({
           'points': FieldValue.increment(100),
         });
       }
     }
 
-    // 5. Create Firestore user document
     final userModel = UserModel(
       uid: user.uid,
       email: email,
       phoneNumber: phoneNumber,
-      name: name,
+      firstName: firstName,
+      lastName: lastName,
       username: username,
       address: address,
       skills: skills,
@@ -85,14 +79,10 @@ class AuthService {
       dateJoined: DateTime.now(),
     );
     await _db.collection('users').doc(user.uid).set(userModel.toFirestore());
-
-    // 6. Send email verification
     await user.sendEmailVerification();
-
     return userModel;
   }
 
-  // ─── Email / Password Login ───────────────────────────────────────────────
   Future<UserModel> loginWithEmail({
     required String email,
     required String password,
@@ -104,77 +94,36 @@ class AuthService {
     return _fetchUserModel(credential.user!.uid);
   }
 
-  // ─── Google Sign-In ───────────────────────────────────────────────────────
-  // Future<UserModel> signInWithGoogle() async {
-  //   final googleUser = await _googleSignIn.signIn();
-  //   if (googleUser == null) {
-  //     throw FirebaseAuthException(
-  //       code: 'sign-in-cancelled',
-  //       message: 'Google sign-in was cancelled.',
-  //     );
-  //   }
-  //   final googleAuth = await googleUser.authentication;
-  //   final credential = GoogleAuthProvider.credential(
-  //     accessToken: googleAuth.accessToken,
-  //     idToken: googleAuth.idToken,
-  //   );
-  //   final userCredential = await _auth.signInWithCredential(credential);
-  //   final user = userCredential.user!;
-
-  //   // Check if first-time
-  //   final doc = await _db.collection('users').doc(user.uid).get();
-  //   if (!doc.exists) {
-  //     // Create minimal profile – user will complete profile later
-  //     final username = 'user_${user.uid.substring(0, 6)}';
-  //     final userModel = UserModel(
-  //       uid: user.uid,
-  //       email: user.email ?? '',
-  //       name: user.displayName ?? 'User',
-  //       username: username,
-  //       referralCode: _generateReferralCode(user.uid),
-  //       avatarUrl: user.photoURL,
-  //       dateJoined: DateTime.now(),
-  //     );
-  //     await _db.collection('users').doc(user.uid).set(userModel.toFirestore());
-  //     return userModel;
-  //   }
-  //   return UserModel.fromFirestore(doc);
-  // }
-
   Future<UserModel> signInWithGoogle() async {
     try {
-      print("Starting Google Sign-In...");
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        print("Google sign-in was cancelled by user.");
         throw FirebaseAuthException(
           code: 'sign-in-cancelled',
           message: 'Google sign-in was cancelled.',
         );
       }
-      print("Google user obtained: ${googleUser.email}");
-      
       final googleAuth = await googleUser.authentication;
-      print("ID Token: ${googleAuth.idToken}");
-      print("Access Token: ${googleAuth.accessToken}");
-      
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      
       final userCredential = await _auth.signInWithCredential(credential);
-      print("Firebase sign-in successful: ${userCredential.user?.uid}");
-      
       final user = userCredential.user!;
-      // Check if first-time user
+
       final doc = await _db.collection('users').doc(user.uid).get();
       if (!doc.exists) {
+        // Split display name into first and last
+        final fullName = user.displayName ?? 'User';
+        final nameParts = fullName.split(' ');
+        final firstName = nameParts.first;
+        final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
         final username = 'user_${user.uid.substring(0, 6)}';
         final userModel = UserModel(
           uid: user.uid,
           email: user.email ?? '',
-          name: user.displayName ?? 'User',
+          firstName: firstName,
+          lastName: lastName,
           username: username,
           referralCode: _generateReferralCode(user.uid),
           avatarUrl: user.photoURL,
@@ -191,8 +140,6 @@ class AuthService {
     }
   }
 
-
-  // ─── Fetch User Model ─────────────────────────────────────────────────────
   Future<UserModel> _fetchUserModel(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
     if (!doc.exists) {
@@ -214,7 +161,6 @@ class AuthService {
     }
   }
 
-  // ─── Sign Out ─────────────────────────────────────────────────────────────
   Future<void> signOut() async {
     await Future.wait([
       _auth.signOut(),
@@ -222,12 +168,10 @@ class AuthService {
     ]);
   }
 
-  // ─── Password Reset ───────────────────────────────────────────────────────
   Future<void> sendPasswordResetEmail(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
   String _generateReferralCode(String uid) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final rng = Random.secure();
@@ -236,12 +180,10 @@ class AuthService {
     return '$base$suffix';
   }
 
-  /// Validate email format
   static bool isValidEmail(String email) {
     return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
   }
 
-  /// Validate Philippine mobile number (+63XXXXXXXXXX)
   static bool isValidPhilippinePhone(String phone) {
     return RegExp(r'^\+63[0-9]{10}$').hasMatch(phone);
   }

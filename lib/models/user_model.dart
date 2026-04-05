@@ -4,7 +4,8 @@ class UserModel {
   final String uid;
   final String email;
   final String? phoneNumber;
-  final String name;
+  final String firstName;
+  final String lastName;
   final String username;
   final String? address;
   final List<String> skills;
@@ -24,7 +25,8 @@ class UserModel {
     required this.uid,
     required this.email,
     this.phoneNumber,
-    required this.name,
+    required this.firstName,
+    required this.lastName,
     required this.username,
     this.address,
     this.skills = const [],
@@ -41,13 +43,17 @@ class UserModel {
     this.badges = const [],
   });
 
+  String get fullName => '$firstName $lastName';
+  String get displayName => '$lastName, $firstName';
+
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return UserModel(
       uid: doc.id,
       email: data['email'] ?? '',
       phoneNumber: data['phoneNumber'],
-      name: data['name'] ?? '',
+      firstName: data['firstName'] ?? '',
+      lastName: data['lastName'] ?? '',
       username: data['username'] ?? '',
       address: data['address'],
       skills: List<String>.from(data['skills'] ?? []),
@@ -65,32 +71,32 @@ class UserModel {
     );
   }
 
-  Map<String, dynamic> toFirestore() {
-    return {
-      'email': email,
-      'phoneNumber': phoneNumber,
-      'name': name,
-      'username': username,
-      'address': address,
-      'skills': skills,
-      'preferredTasks': preferredTasks,
-      'referralCode': referralCode,
-      'usedReferralCode': usedReferralCode,
-      'points': points,
-      'jobsTaken': jobsTaken,
-      'jobsFinished': jobsFinished,
-      'avatarUrl': avatarUrl,
-      'level': level,
-      'levelProgress': levelProgress,
-      'dateJoined': Timestamp.fromDate(dateJoined),
-      'badges': badges,
-    };
-  }
+  Map<String, dynamic> toFirestore() => {
+        'email': email,
+        'phoneNumber': phoneNumber,
+        'firstName': firstName,
+        'lastName': lastName,
+        'username': username,
+        'address': address,
+        'skills': skills,
+        'preferredTasks': preferredTasks,
+        'referralCode': referralCode,
+        'usedReferralCode': usedReferralCode,
+        'points': points,
+        'jobsTaken': jobsTaken,
+        'jobsFinished': jobsFinished,
+        'avatarUrl': avatarUrl,
+        'level': level,
+        'levelProgress': levelProgress,
+        'dateJoined': Timestamp.fromDate(dateJoined),
+        'badges': badges,
+      };
 
   UserModel copyWith({
     String? email,
     String? phoneNumber,
-    String? name,
+    String? firstName,
+    String? lastName,
     String? username,
     String? address,
     List<String>? skills,
@@ -109,7 +115,8 @@ class UserModel {
       uid: uid,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
-      name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       username: username ?? this.username,
       address: address ?? this.address,
       skills: skills ?? this.skills,
@@ -126,7 +133,4 @@ class UserModel {
       badges: badges ?? this.badges,
     );
   }
-
-  @override
-  String toString() => 'UserModel(uid: $uid, username: $username, points: $points)';
 }

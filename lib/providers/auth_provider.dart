@@ -12,28 +12,22 @@ class AuthProvider extends ChangeNotifier {
     _init();
   }
 
-  // ─── State ────────────────────────────────────────────────────────────────
   AuthStatus _status = AuthStatus.initial;
   UserModel? _user;
   String? _errorMessage;
-
-  // Multi-step signup temp data
   String _signupEmail = '';
   String _signupPhone = '';
   String _signupPassword = '';
 
-  // ─── Getters ──────────────────────────────────────────────────────────────
   AuthStatus get status => _status;
   UserModel? get user => _user;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   bool get isLoading => _status == AuthStatus.loading;
-
   String get signupEmail => _signupEmail;
   String get signupPhone => _signupPhone;
   String get signupPassword => _signupPassword;
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
   void _init() {
     _authService.authStateChanges.listen((firebaseUser) async {
       if (firebaseUser == null) {
@@ -52,7 +46,6 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
-  // ─── Save Step 1 Data ─────────────────────────────────────────────────────
   void saveSignupStep1({
     required String email,
     required String phone,
@@ -64,9 +57,9 @@ class AuthProvider extends ChangeNotifier {
     clearError();
   }
 
-  // ─── Sign Up ──────────────────────────────────────────────────────────────
   Future<bool> signUp({
-    required String name,
+    required String firstName,
+    required String lastName,
     required String username,
     required String address,
     required List<String> skills,
@@ -79,7 +72,8 @@ class AuthProvider extends ChangeNotifier {
         email: _signupEmail,
         password: _signupPassword,
         phoneNumber: _signupPhone,
-        name: name,
+        firstName: firstName,
+        lastName: lastName,
         username: username,
         address: address,
         skills: skills,
@@ -99,7 +93,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Login ────────────────────────────────────────────────────────────────
   Future<bool> loginWithEmail({
     required String email,
     required String password,
@@ -123,7 +116,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Google Sign-In ───────────────────────────────────────────────────────
   Future<bool> signInWithGoogle() async {
     _setLoading();
     try {
@@ -146,7 +138,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Sign Out ─────────────────────────────────────────────────────────────
   Future<void> signOut() async {
     await _authService.signOut();
     _user = null;
@@ -154,7 +145,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Password Reset ───────────────────────────────────────────────────────
   Future<bool> sendPasswordReset(String email) async {
     _setLoading();
     try {
@@ -168,7 +158,14 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  Future<void> refreshUser() async {
+    final newUser = await _authService.getCurrentUserModel();
+    if (newUser != null) {
+      _user = newUser;
+      notifyListeners();
+    }
+  }
+
   void _setLoading() {
     _status = AuthStatus.loading;
     _errorMessage = null;

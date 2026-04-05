@@ -1,27 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:percent_indicator/percent_indicator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../../models/user_model.dart';
 import '../../models/post_model.dart';
+import '../../models/task_model.dart';
+import '../../models/report_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/post_service.dart';
 import '../../widgets/post_card.dart';
-
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _UserPostsTab extends StatefulWidget {
-  final String userId;
-  const _UserPostsTab({required this.userId});
-
-  @override
-  State<_UserPostsTab> createState() => _UserPostsTabState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen>
@@ -35,7 +29,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   @override
-  void dispose() { _tabs.dispose(); super.dispose(); }
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,11 +42,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.white, elevation: 0,
+        backgroundColor: AppColors.white,
+        elevation: 0,
         title: const Text('Profile', style: AppTextStyles.h2),
         actions: [
-          IconButton(icon: const Icon(Icons.settings_outlined, color: AppColors.textDark), onPressed: () => Navigator.pushNamed(context, '/settings')),
-          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.textDark),
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
+          ),
         ],
       ),
       body: NestedScrollView(
@@ -80,9 +80,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           children: [
             _InfoTab(user: user),
             _UserPostsTab(userId: user.uid),
-            const _EmptyTab(label: 'No tasks yet', icon: Icons.assignment_outlined),
-            const _EmptyTab(label: 'No reports yet', icon: Icons.report_outlined),
-            const _EmptyTab(label: 'No rewards yet', icon: Icons.card_giftcard_outlined),
+            _UserTasksTab(userId: user.uid),
+            _UserReportsTab(userId: user.uid),
+            _RewardsTab(user: user),
           ],
         ),
       ),
@@ -90,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 }
 
-// ─── Profile header ────────────────────────────────────────────────────────────
+// Profile header (unchanged, but uses displayName)
 class _ProfileHeader extends StatelessWidget {
   final UserModel user;
   const _ProfileHeader({required this.user});
@@ -100,27 +100,26 @@ class _ProfileHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Avatar + info row
         Row(children: [
           Stack(children: [
             CircleAvatar(
-              radius: 40, backgroundColor: AppColors.chipBg,
+              radius: 40,
+              backgroundColor: AppColors.chipBg,
               backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
               child: user.avatarUrl == null
-                  ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                  ? Text(user.firstName.isNotEmpty ? user.firstName[0].toUpperCase() : 'U',
                       style: const TextStyle(fontFamily: 'Poppins', fontSize: 30, fontWeight: FontWeight.w700, color: AppColors.primary))
                   : null,
             ),
             Positioned(bottom: 0, right: 0,
-              child: Container(
-                width: 26, height: 26,
+              child: Container(width: 26, height: 26,
                 decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                child: const Icon(Icons.camera_alt, color: AppColors.white, size: 14),
-              )),
+                child: const Icon(Icons.camera_alt, color: AppColors.white, size: 14)),
+            ),
           ]),
           const SizedBox(width: 16),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(user.name, style: AppTextStyles.h2),
+            Text(user.displayName, style: AppTextStyles.h2),
             Text('@${user.username}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary)),
             if (user.address != null)
               Row(children: [
@@ -135,15 +134,12 @@ class _ProfileHeader extends StatelessWidget {
               child: Text('Lvl 2 | ${user.level}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
             ),
           ])),
-          // Points
           Column(children: [
             Text('${user.points}', style: const TextStyle(fontFamily: 'Poppins', fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.primary)),
             Text('Impact\nPower', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey), textAlign: TextAlign.center),
           ]),
         ]),
         const SizedBox(height: 16),
-
-        // Level progress bar
         LinearPercentIndicator(
           lineHeight: 10, percent: (user.levelProgress / 100).clamp(0.0, 1.0),
           backgroundColor: AppColors.borderGrey,
@@ -154,47 +150,60 @@ class _ProfileHeader extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         const Text('Level Progress', style: AppTextStyles.bodySmall),
-        const SizedBox(height: 12),
-
-        // Share / stats row
-        TextButton(
-          onPressed: () {},
-          style: TextButton.styleFrom(padding: EdgeInsets.zero),
-          child: Text('Tap to share or view Rewards/Tasks/Reports →',
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary)),
-        ),
       ]),
     );
   }
 }
 
-// ─── Info tab ──────────────────────────────────────────────────────────────────
-class _InfoTab extends StatelessWidget {
+// Info tab with editable fields
+class _InfoTab extends StatefulWidget {
   final UserModel user;
   const _InfoTab({required this.user});
 
   @override
+  State<_InfoTab> createState() => _InfoTabState();
+}
+
+class _InfoTabState extends State<_InfoTab> {
+  Future<void> _editField(String field, String currentValue) async {
+    final controller = TextEditingController(text: currentValue);
+    final newValue = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Edit $field'),
+        content: TextField(controller: controller, decoration: InputDecoration(hintText: 'New $field')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (newValue != null && newValue != currentValue) {
+      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({field: newValue});
+      await context.read<AuthProvider>().refreshUser();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = widget.user;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         const Text('User Details', style: AppTextStyles.h2),
         const SizedBox(height: 16),
-        _EditableField(label: 'Name', value: user.name, icon: Icons.person_outline),
-        _EditableField(label: 'Username', value: '@${user.username}', icon: Icons.alternate_email),
-        _EditableField(label: 'Address', value: user.address ?? '—', icon: Icons.location_on_outlined),
-        _EditableField(label: 'Email', value: user.email, icon: Icons.email_outlined),
-        _EditableField(label: 'Phone Number', value: user.phoneNumber ?? '—', icon: Icons.phone_outlined),
+        _EditableField(label: 'First Name', value: user.firstName, icon: Icons.person_outline, onEdit: () => _editField('firstName', user.firstName)),
+        _EditableField(label: 'Last Name', value: user.lastName, icon: Icons.person_outline, onEdit: () => _editField('lastName', user.lastName)),
+        _EditableField(label: 'Username', value: '@${user.username}', icon: Icons.alternate_email, onEdit: () => _editField('username', user.username)),
+        _EditableField(label: 'Address', value: user.address ?? '—', icon: Icons.location_on_outlined, onEdit: () => _editField('address', user.address ?? '')),
+        _EditableField(label: 'Email', value: user.email, icon: Icons.email_outlined, onEdit: () => _editField('email', user.email)),
+        _EditableField(label: 'Phone Number', value: user.phoneNumber ?? '—', icon: Icons.phone_outlined, onEdit: () => _editField('phoneNumber', user.phoneNumber ?? '')),
         const _EditableField(label: 'Password', value: '••••••••', icon: Icons.lock_outline, isPassword: true),
         const SizedBox(height: 8),
-
-        // Skills
         _ChipListField(label: 'Skills', values: user.skills),
         const SizedBox(height: 12),
         _ChipListField(label: 'Preferred Tasks', values: user.preferredTasks),
         const SizedBox(height: 16),
-
-        // Referral code
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(16)),
@@ -212,8 +221,6 @@ class _InfoTab extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 24),
-
-        // Achievements
         const Text('Achievements', style: AppTextStyles.h2),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
@@ -222,8 +229,6 @@ class _InfoTab extends StatelessWidget {
           _AchievementBadge(icon: Icons.emoji_events, label: 'Complete 5\ntasks', earned: user.jobsFinished >= 5),
         ]),
         const SizedBox(height: 24),
-
-        // Stats
         const Text('Stats', style: AppTextStyles.h2),
         const SizedBox(height: 12),
         _StatRow(label: 'Jobs Taken', value: user.jobsTaken.toString()),
@@ -238,8 +243,8 @@ class _InfoTab extends StatelessWidget {
 }
 
 class _EditableField extends StatelessWidget {
-  final String label; final String value; final IconData icon; final bool isPassword;
-  const _EditableField({required this.label, required this.value, required this.icon, this.isPassword = false});
+  final String label; final String value; final IconData icon; final bool isPassword; final VoidCallback? onEdit;
+  const _EditableField({required this.label, required this.value, required this.icon, this.isPassword = false, this.onEdit});
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 12),
@@ -251,7 +256,8 @@ class _EditableField extends StatelessWidget {
         const SizedBox(height: 2),
         Text(value, style: AppTextStyles.bodyMedium),
       ])),
-      const Icon(Icons.edit_outlined, color: AppColors.primary, size: 18),
+      if (onEdit != null)
+        GestureDetector(onTap: onEdit, child: const Icon(Icons.edit_outlined, color: AppColors.primary, size: 18)),
     ]),
   );
 }
@@ -273,11 +279,7 @@ class _ChipListField extends StatelessWidget {
       Wrap(spacing: 6, runSpacing: 4, children: values.map((v) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(color: AppColors.chipBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.primary.withValues(alpha: 0.4))),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(v, style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500)),
-          const SizedBox(width: 4),
-          const Icon(Icons.close, size: 12, color: AppColors.primary),
-        ]),
+        child: Text(v, style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500)),
       )).toList()),
   ]);
 }
@@ -315,18 +317,132 @@ class _StatRow extends StatelessWidget {
   );
 }
 
-class _EmptyTab extends StatelessWidget {
-  final String label; final IconData icon;
-  const _EmptyTab({required this.label, required this.icon});
+// Tabs: Posts, Tasks, Reports, Rewards
+class _UserPostsTab extends StatelessWidget {
+  final String userId;
+  const _UserPostsTab({required this.userId});
   @override
-  Widget build(BuildContext context) => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    Icon(icon, size: 64, color: AppColors.borderGrey),
-    const SizedBox(height: 12),
-    Text(label, style: AppTextStyles.bodySmall),
-  ]));
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<PostModel>>(
+      stream: PostService().getPostsByUser(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+        }
+        final posts = snapshot.data ?? [];
+        if (posts.isEmpty) {
+          return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.grid_on_outlined, size: 64, color: AppColors.borderGrey),
+            SizedBox(height: 12),
+            Text('No posts yet', style: AppTextStyles.bodySmall),
+          ]));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 16),
+          itemCount: posts.length,
+          itemBuilder: (context, i) => PostCard(
+            post: posts[i],
+            currentUserId: userId,
+            userVote: null,
+            onUpvote: () {},
+            onDownvote: () {},
+          ),
+        );
+      },
+    );
+  }
 }
 
-// ─── Persistent header for tab bar ────────────────────────────────────────────
+class _UserTasksTab extends StatelessWidget {
+  final String userId;
+  const _UserTasksTab({required this.userId});
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<TaskModel>>(
+      stream: FirebaseFirestore.instance.collection('tasks')
+          .where('acceptedBy', isEqualTo: userId)
+          .snapshots()
+          .map((snap) => snap.docs.map((d) => TaskModel.fromFirestore(d)).toList()),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final tasks = snapshot.data!;
+        if (tasks.isEmpty) {
+          return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.assignment_outlined, size: 64, color: AppColors.borderGrey),
+            SizedBox(height: 12),
+            Text('No tasks taken', style: AppTextStyles.bodySmall),
+          ]));
+        }
+        return ListView.builder(
+          itemCount: tasks.length,
+          itemBuilder: (_, i) => ListTile(
+            title: Text(tasks[i].title, style: AppTextStyles.bodyMedium),
+            subtitle: Text('Status: ${tasks[i].status.name}', style: AppTextStyles.bodySmall),
+            trailing: Text('${tasks[i].points} pts', style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UserReportsTab extends StatelessWidget {
+  final String userId;
+  const _UserReportsTab({required this.userId});
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<ReportModel>>(
+      stream: FirebaseFirestore.instance.collection('reports')
+          .where('reportedBy', isEqualTo: userId)
+          .orderBy('reportedAt', descending: true)
+          .snapshots()
+          .map((snap) => snap.docs.map((d) => ReportModel.fromFirestore(d)).toList()),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final reports = snapshot.data!;
+        if (reports.isEmpty) {
+          return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.report_outlined, size: 64, color: AppColors.borderGrey),
+            SizedBox(height: 12),
+            Text('No reports submitted', style: AppTextStyles.bodySmall),
+          ]));
+        }
+        return ListView.builder(
+          itemCount: reports.length,
+          itemBuilder: (_, i) => ListTile(
+            title: Text(reports[i].title, style: AppTextStyles.bodyMedium),
+            subtitle: Text('${reports[i].hazardSubcategory} • ${reports[i].status.name}', style: AppTextStyles.bodySmall),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RewardsTab extends StatelessWidget {
+  final UserModel user;
+  const _RewardsTab({required this.user});
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text('Badges Earned', style: AppTextStyles.h2),
+        const SizedBox(height: 12),
+        if (user.badges.isEmpty)
+          const Text('No badges yet. Complete tasks to earn badges!', style: AppTextStyles.bodySmall)
+        else
+          Wrap(spacing: 12, children: user.badges.map((b) => Chip(label: Text(b))).toList()),
+        const SizedBox(height: 24),
+        const Text('Points History', style: AppTextStyles.h2),
+        const SizedBox(height: 12),
+        // Placeholder – you can implement a Firestore subcollection for points history
+        const Text('Coming soon', style: AppTextStyles.bodySmall),
+      ],
+    );
+  }
+}
+
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
   const _TabBarDelegate(this.tabBar);
@@ -339,54 +455,4 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
       Container(color: AppColors.white, child: tabBar);
   @override
   bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => tabBar != oldDelegate.tabBar;
-}
-
-// ─── Post Tab ────────────────────────────────────────────
-
-class _UserPostsTabState extends State<_UserPostsTab> {
-  late Stream<List<PostModel>> _stream;
-
-  @override
-  void initState() {
-    super.initState();
-    _stream = PostService().getPostsByUser(widget.userId);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<PostModel>>(
-      stream: _stream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
-        }
-
-        final posts = snapshot.data ?? [];
-
-        if (posts.isEmpty) {
-          return const _EmptyTab(
-            label: 'No posts yet',
-            icon: Icons.grid_on_outlined,
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 16),
-          itemCount: posts.length,
-          itemBuilder: (context, i) {
-            final post = posts[i];
-            return PostCard(
-              post: post,
-              currentUserId: widget.userId,
-              userVote: null,
-              onUpvote: () {},
-              onDownvote: () {},
-            );
-          },
-        );
-      },
-    );
-  }
 }

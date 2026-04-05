@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/task_model.dart';
 import '../services/task_service.dart';
 
@@ -14,13 +15,10 @@ class TaskProvider extends ChangeNotifier {
   TaskModel? _activeTask;
   bool _isLoading = false;
   String? _error;
-
-  // Timer state
   Duration _elapsed = Duration.zero;
   Timer? _timer;
   bool _timerRunning = false;
 
-  // Getters
   List<TaskModel> get tasks => _tasks;
   TaskModel? get activeTask => _activeTask;
   bool get isLoading => _isLoading;
@@ -33,7 +31,6 @@ class TaskProvider extends ChangeNotifier {
   List<TaskModel> get myTasks =>
       _tasks.where((t) => t.status != TaskStatus.open).toList();
 
-  // ─── Load ──────────────────────────────────────────────────────────────────
   Future<void> loadTasks({bool refresh = false}) async {
     if (_isLoading) return;
     _isLoading = true;
@@ -43,7 +40,7 @@ class TaskProvider extends ChangeNotifier {
       final firestoreTasks = await _service.getTasks();
       _tasks = [...firestoreTasks, ...TaskModel.mockTasks];
     } catch (e) {
-      _tasks = TaskModel.mockTasks; // fallback to mock if Firestore fails
+      _tasks = TaskModel.mockTasks;
       _error = 'Failed to load tasks.';
     } finally {
       _isLoading = false;
@@ -51,17 +48,17 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Accept Task ───────────────────────────────────────────────────────────
   Future<bool> acceptTask(String taskId, String userId) async {
     if (_tasks.isEmpty) await loadTasks();
-
     final idx = _tasks.indexWhere((t) => t.id == taskId);
     if (idx == -1) return false;
-
     try {
       await _service.acceptTask(taskId, userId);
+      // Increment jobsTaken for user
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'jobsTaken': FieldValue.increment(1),
+      });
     } catch (_) {}
-
     _tasks[idx] = _tasks[idx].copyWith(
       status: TaskStatus.accepted,
       acceptedBy: userId,
@@ -72,7 +69,6 @@ class TaskProvider extends ChangeNotifier {
     return true;
   }
 
-  // ─── Start Timer ───────────────────────────────────────────────────────────
   void startTimer() {
     if (_timerRunning) return;
     _timerRunning = true;
@@ -89,16 +85,18 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Complete Task ─────────────────────────────────────────────────────────
-  Future<void> completeTask(String taskId) async {
+  Future<void> completeTask(String taskId, String userId, int points) async {
     pauseTimer();
     final idx = _tasks.indexWhere((t) => t.id == taskId);
     if (idx == -1) return;
-
     try {
       await _service.completeTask(taskId);
+      // Award points and increment jobsFinished
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'points': FieldValue.increment(points),
+        'jobsFinished': FieldValue.increment(1),
+      });
     } catch (_) {}
-
     _tasks[idx] = _tasks[idx].copyWith(
       status: TaskStatus.completed,
       completedAt: DateTime.now(),
@@ -107,20 +105,23 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Submit Verification ───────────────────────────────────────────────────
   Future<bool> submitVerification({
     required String taskId,
+    required String userId,
+    required int points,
     required String note,
     List<String> photos = const [],
   }) async {
     final idx = _tasks.indexWhere((t) => t.id == taskId);
     if (idx == -1) return false;
-
     try {
-      await _service.submitVerification(
-          taskId: taskId, note: note, photos: photos);
+      await _service.submitVerification(taskId: taskId, note: note, photos: photos);
+      // Award points after verification
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'points': FieldValue.increment(points),
+        'jobsFinished': FieldValue.increment(1),
+      });
     } catch (_) {}
-
     _tasks[idx] = _tasks[idx].copyWith(
       status: TaskStatus.verified,
       verificationNote: note,
@@ -132,7 +133,6 @@ class TaskProvider extends ChangeNotifier {
     return true;
   }
 
-  // ─── Create Task ───────────────────────────────────────────────────────────
   Future<TaskModel?> createTask({
     required String title,
     required String description,

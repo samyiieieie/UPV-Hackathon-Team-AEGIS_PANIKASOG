@@ -24,7 +24,7 @@ class PostService {
     return PostModel.fromFirestore(doc);
   }
 
-  // ─── Create Post ───────────────────────────────────────────────────────────
+  // ─── Create Post (with improved image upload error handling) ───────────────
 
   Future<PostModel> createPost({
     required String authorId,
@@ -44,18 +44,25 @@ class PostService {
     String? imageUrl;
 
     if (imageFile != null) {
-      final ref = FirebaseStorage.instance.ref(
-        'posts/${DateTime.now().millisecondsSinceEpoch}_$authorId.jpg',
-      );
-      await ref.putFile(imageFile);
-      imageUrl = await ref.getDownloadURL();
+      try {
+        final ref = FirebaseStorage.instance.ref(
+          'posts/${DateTime.now().millisecondsSinceEpoch}_$authorId.jpg',
+        );
+        await ref.putFile(imageFile);
+        imageUrl = await ref.getDownloadURL();
+      } catch (e) {
+        print('Image upload failed: $e');
+        // imageUrl remains null, post will be created without image
+      }
     }
 
     final docRef = _db.collection('posts').doc();
     final post = PostModel(
       id: docRef.id,
       authorId: authorId,
-      authorUsername: authorUsername,
+      authorUsername: authorUsername.isNotEmpty
+          ? authorUsername
+          : 'user_${authorId.substring(0, 6)}', // fallback for missing username
       authorAvatarUrl: authorAvatarUrl,
       authorIsVerified: authorIsVerified,
       barangay: barangay,
@@ -99,7 +106,6 @@ class PostService {
     await _db.runTransaction((tx) async {
       final voteDoc = await tx.get(voteRef);
 
-      // Fix: avoid null-aware subscript inside ternary — read separately
       String? existingVote;
       if (voteDoc.exists) {
         final voteData = voteDoc.data();
@@ -130,7 +136,7 @@ class PostService {
     });
   }
 
-  // ─── Urgent Tasks ──────────────────────────────────────────────────────────
+  // ─── Urgent Tasks Stream ──────────────────────────────────────────────────
 
   Stream<List<UrgentTaskModel>> urgentTasksStream() {
     return _db
@@ -145,7 +151,19 @@ class PostService {
             .toList());
   }
 
-  // ─── Mock data for development ─────────────────────────────────────────────
+  // ─── User Posts Stream ────────────────────────────────────────────────────
+
+  Stream<List<PostModel>> getPostsByUser(String userId) {
+    return _db
+        .collection('posts')
+        .where('authorId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList());
+  }
+
+  // ─── Mock data for development (kept for fallback) ────────────────────────
 
   static List<PostModel> get mockPosts => [
         PostModel(
@@ -211,17 +229,4 @@ class PostService {
           isVerifiedUrgent: true,
         ),
       ];
-
-      // ─── User Posts ───────────────────────────────────────────
-
-    Stream<List<PostModel>> getPostsByUser(String userId) {
-    return _db
-        .collection('posts')
-        .where('authorId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList());
 }
-}
-
