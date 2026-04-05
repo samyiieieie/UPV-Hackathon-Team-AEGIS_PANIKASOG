@@ -105,6 +105,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           title: _titleCtrl.text.trim(),
           caption: _captionCtrl.text.trim(),
           imageFile: _selectedImages.isNotEmpty ? _selectedImages.first : null,
+          imageFiles: _selectedImages,
           tags: _tags,
           category: _selectedCategory,
         );
