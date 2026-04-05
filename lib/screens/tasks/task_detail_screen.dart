@@ -640,12 +640,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.white, elevation: 0,
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.primary, size: 20), onPressed: () => Navigator.pop(context)),
-        title: Row(children: [
-          Container(width: 28, height: 28, decoration: const BoxDecoration(color: AppColors.chipBg, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_back_ios_new, size: 12, color: AppColors.primary)),
-          const SizedBox(width: 8),
-          const Text('Create a Task', style: AppTextStyles.h2),
-        ]),
+        title: const Text('Create a Task', style: AppTextStyles.h2),
       ),
       body: Form(
         key: _formKey,
