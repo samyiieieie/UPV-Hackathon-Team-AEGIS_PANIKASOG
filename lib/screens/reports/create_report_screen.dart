@@ -177,7 +177,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     }
 
     final report = ReportModel(
-      id: '', // will be set by Firestore
+      id: '',
       reportedBy: user.uid,
       reporterUsername: user.username,
       reporterAvatarUrl: user.avatarUrl,
@@ -192,8 +192,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     );
 
     await FirebaseFirestore.instance.collection('reports').add(report.toFirestore());
+    if (!mounted) return; // ADDED
     setState(() => _submitting = false);
-    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted! Thank you. 🙏'), backgroundColor: AppColors.success));
   }

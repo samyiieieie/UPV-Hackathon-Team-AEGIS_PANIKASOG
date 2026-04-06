@@ -46,6 +46,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         .collection('comments')
         .add(commentData);
 
+    if (!mounted) return; // ADDED
+
     await _firestore
         .collection('posts')
         .doc(widget.post.id)

@@ -42,6 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (file == null) return;
+    if (!mounted) return; // ADDED
     final user = context.read<AuthProvider>().user;
     if (user == null) return;
 
@@ -52,15 +53,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       final ref = FirebaseStorage.instance.ref().child('avatars/${user.uid}.jpg');
       await ref.putFile(File(file.path));
+      if (!mounted) return; // ADDED
       final url = await ref.getDownloadURL();
 
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'avatarUrl': url});
+      if (!mounted) return; // ADDED
       await context.read<AuthProvider>().refreshUser();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile picture updated!'), backgroundColor: AppColors.success),
-        );
-      }
+      if (!mounted) return; // ADDED
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture updated!'), backgroundColor: AppColors.success),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -129,7 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 // Profile header with avatar upload callback
 class _ProfileHeader extends StatelessWidget {
   final UserModel user;
-  final VoidCallback? onAvatarTap; // Added missing parameter
+  final VoidCallback? onAvatarTap;
   const _ProfileHeader({required this.user, this.onAvatarTap});
 
   int _nextLevelExp(int exp) {
@@ -160,7 +162,7 @@ class _ProfileHeader extends StatelessWidget {
             Positioned(
               bottom: 0, right: 0,
               child: GestureDetector(
-                onTap: onAvatarTap, // Now correctly defined
+                onTap: onAvatarTap,
                 child: Container(
                   width: 26, height: 26,
                   decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),

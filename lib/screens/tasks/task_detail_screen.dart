@@ -194,6 +194,7 @@ class TaskDetailScreen extends StatelessWidget {
     }
     final success =
         await context.read<TaskProvider>().acceptTask(task.id, userId);
+    // StatelessWidget – use context.mounted
     if (!context.mounted) return;
     if (success) {
       Navigator.pushReplacement(context,
@@ -317,10 +318,7 @@ class TaskNavigateScreen extends StatelessWidget {
   final TaskModel task;
   const TaskNavigateScreen({super.key, required this.task});
 
-  // FIX: Check-in now verifies the user is within 50 metres of the task
-  //      location before proceeding to the progress/timer screen.
   Future<void> _checkIn(BuildContext context) async {
-    // If task has no coordinates, skip proximity check.
     if (task.latitude == null || task.longitude == null) {
       Navigator.push(context,
           MaterialPageRoute(builder: (_) => TaskProgressScreen(task: task)));
@@ -375,7 +373,6 @@ class TaskNavigateScreen extends StatelessWidget {
         ));
       }
     } catch (e) {
-      // Location unavailable — allow check-in with a warning in debug.
       if (context.mounted) {
         if (kDebugMode) {
           Navigator.push(
@@ -494,8 +491,6 @@ class _TaskProgressScreenState extends State<TaskProgressScreen> {
     });
   }
 
-  // FIX: Actually launch the camera and upload the photo to Firebase Storage.
-  //      Previously this just showed a "coming soon" snackbar.
   Future<void> _logProgressPhoto() async {
     setState(() => _uploadingPhoto = true);
     try {
@@ -503,7 +498,7 @@ class _TaskProgressScreenState extends State<TaskProgressScreen> {
       final file =
           await picker.pickImage(source: ImageSource.camera, imageQuality: 75);
       if (file == null) {
-        setState(() => _uploadingPhoto = false);
+        if (mounted) setState(() => _uploadingPhoto = false);
         return;
       }
 
@@ -512,7 +507,7 @@ class _TaskProgressScreenState extends State<TaskProgressScreen> {
           'task_progress/${widget.task.id}/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await ref.putFile(File(file.path));
       final url = await ref.getDownloadURL();
-      setState(() => _uploadedPhotoUrls.add(url));
+      if (mounted) setState(() => _uploadedPhotoUrls.add(url));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -533,10 +528,6 @@ class _TaskProgressScreenState extends State<TaskProgressScreen> {
     final userId = context.read<AuthProvider>().user?.uid ?? '';
     if (userId.isEmpty) return;
 
-    // FIX: Pass the uploaded photo URLs to submitVerification so they are
-    //      stored in Firestore alongside the verification record.
-    //      Points are awarded ONCE inside TaskService.submitVerification()
-    //      via UserProgressService — no double-counting.
     await context.read<TaskProvider>().submitVerification(
           taskId: widget.task.id,
           userId: userId,
@@ -855,7 +846,7 @@ class _TaskVerificationScreenState extends State<TaskVerificationScreen> {
           note: _noteCtrl.text.trim(),
         );
     setState(() => _submitting = false);
-    if (!context.mounted) return;
+    if (!mounted) return;
     Navigator.push(context,
         MaterialPageRoute(builder: (_) => TaskRewardsScreen(task: widget.task)));
   }
@@ -987,9 +978,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   DateTime _startDate = DateTime.now().add(const Duration(hours: 2));
   DateTime _endDate = DateTime.now().add(const Duration(hours: 6));
 
-  // Update pin on the map, converts coordinates to a Barangay name
   Future<void> _updateMarker(LatLng position) async {
-    // Update the visual marker first
     setState(() {
       _pickedMarker = Marker(
         markerId: const MarkerId('picked_location'),
@@ -998,7 +987,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     });
 
     try {
-      // Convert Lat/Long to Address list
       List<geo.Placemark> placemarks = await geo.placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -1006,36 +994,35 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
       if (placemarks.isNotEmpty) {
         geo.Placemark place = placemarks.first;
-
-        // Construct a PH-friendly address: "Brgy, City"
         String barangay = place.subLocality ?? place.name ?? "Unknown Brgy";
         String city = place.locality ?? "Iloilo City";
-
-        setState(() {
-          _locationCtrl.text = "$barangay, $city";
-        });
+        if (mounted) {
+          setState(() {
+            _locationCtrl.text = "$barangay, $city";
+          });
+        }
       }
     } catch (e) {
-      // Fallback: If internet fails, show coordinates
       debugPrint("Reverse Geocoding failed: $e");
-      setState(() {
-        _locationCtrl.text =
-            "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
-      });
+      if (mounted) {
+        setState(() {
+          _locationCtrl.text =
+              "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
+        });
+      }
     }
   }
 
-  // auto-detect current location and perform Reverse Geocoding
   Future<void> _handleLocationDetection() async {
     try {
-      // 1. Check if GPS is ON
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Please enable location services in settings.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Please enable location services in settings.')),
+          );
+        }
         return;
       }
       LocationPermission permission = await Geolocator.checkPermission();
@@ -1045,18 +1032,15 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        // Direct user to settings if they blocked it permanently
         return;
       }
 
-      // 3. Get Position
-      setState(() => _locationCtrl.text = "Detecting address...");
+      if (mounted) setState(() => _locationCtrl.text = "Detecting address...");
 
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
 
-      // 4. Create LatLng object
       LatLng detectedLatLng = LatLng(position.latitude, position.longitude);
 
       if (_mapController != null) {
@@ -1069,7 +1053,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         }
       }
 
-      // 5. Trigger the Marker update AND Name Lookup
       await _updateMarker(detectedLatLng);
     } catch (e) {
       debugPrint("GPS Error: $e");
@@ -1083,7 +1066,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     if (query.isEmpty) return;
 
     try {
-      // search for a location in Iloilo
       String fullQuery = "$query, Iloilo City, Philippines";
       debugPrint("Searching for: $fullQuery");
 
@@ -1105,16 +1087,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           }
         }
 
-        // 2. Move the Camera
-        if (_mapController != null) {
-          _mapController!.animateCamera(
-            CameraUpdate.newLatLngZoom(target, 16),
-          );
-        } else {
-          debugPrint("Map Controller is NULL!");
-        }
-
-        // 3. Update the Marker and the Input Box text
         await _updateMarker(target);
       } else {
         _showError("No results found for '$query'");
@@ -1126,9 +1098,11 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+      );
+    }
   }
 
   @override
@@ -1331,7 +1305,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                       if (!mounted) return;
                       _mapController = controller;
                     },
-                    // display the marker
                     markers: _pickedMarker != null ? {_pickedMarker!} : {},
                     onCameraMove: (p) => _updateMarker(p.target),
                   ),
@@ -1467,11 +1440,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           scheduledEnd: _endDate,
           createdBy: user?.uid ?? '',
           isUrgent: _isUrgent,
-          latitude: _currentLatLng.latitude,
-          longitude: _currentLatLng.longitude,
         );
     setState(() => _submitting = false);
-    if (!context.mounted) return;
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Task created! 🎉'),

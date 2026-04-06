@@ -150,73 +150,72 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-void _showChangePasswordDialog(BuildContext context) {
-  final oldCtrl = TextEditingController();
-  final newCtrl = TextEditingController();
-  final confirmCtrl = TextEditingController();
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('Change Password'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: oldCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Current Password'),
+  void _showChangePasswordDialog(BuildContext context) {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Change Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: oldCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Current Password'),
+            ),
+            TextField(
+              controller: newCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New Password'),
+            ),
+            TextField(
+              controller: confirmCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Confirm Password'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-          TextField(
-            controller: newCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'New Password'),
-          ),
-          TextField(
-            controller: confirmCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Confirm Password'),
+          TextButton(
+            onPressed: () async {
+              if (newCtrl.text != confirmCtrl.text) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Passwords do not match')),
+                );
+                return;
+              }
+              try {
+                await AuthService().changePassword(
+                  currentPassword: oldCtrl.text,
+                  newPassword: newCtrl.text,
+                );
+                if (Navigator.of(context).mounted) { // ADDED
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password changed successfully!')),
+                  );
+                }
+              } catch (e) {
+                if (Navigator.of(context).mounted) { // ADDED
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString())),
+                  );
+                }
+              }
+            },
+            child: const Text('Update'),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () async {
-            if (newCtrl.text != confirmCtrl.text) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Passwords do not match')),
-              );
-              return;
-            }
-            try {
-              await AuthService().changePassword(
-                currentPassword: oldCtrl.text,
-                newPassword: newCtrl.text,
-              );
-              // Use mounted check with the dialog context
-              if (Navigator.of(context).mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password changed successfully!')),
-                );
-              }
-            } catch (e) {
-              if (Navigator.of(context).mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString())),
-                );
-              }
-            }
-          },
-          child: const Text('Update'),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(

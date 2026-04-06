@@ -1,11 +1,53 @@
 # PANIKASOG – Community Disaster Response App
 
-> **Bisaya for "Run/Flee"** — a mobile platform empowering communities to respond,
-> report, and recover together during disasters.
 
----
+> **Hiligaynon word for "relentless/persistent"** — a mobile platform empowering Ilonggo communities to respond, report, and recover together during disasters.
+
+
+Panikasog is a community-centric, gamified disaster resilience mobile application built for the communities of Panay Island, one of the most disaster-prone island groups in the Philippines. The name comes from the Hiligaynon word meaning "relentless" or "persistent," reflecting the platform's core philosophy: that consistent, small, preventive actions taken by ordinary citizens are more powerful than reactive emergency response after the damage has been done.
+
+
+## Functional Scope — What our System Does
+
+
+### Current Features
+
+
+- **Home**: Community feed with upvote/downvote verification
+- **Posts:** Community-driven updates for disaster phases (e.g., preparedness cleanup drives, real-time rescue requests or route alerts, and post-disaster recovery efforts)
+- **Tasks:** Community task management — citizens accept, complete, and verify disaster prevention missions
+- **Reports:** Hazard and disaster reporting with GPS tagging and status tracking.
+- **Leaderboards:** Points and experience-based gamification with leaderboards with weekly and monthly rankings.
+- **Rewards:** Rewards redemption via partner merchant networks, and Referral incentive system for community growth
+
+
+### In Scope (for Future Development)
+
+
+- **Home:** LGU announcement pinning
+- **Leaderboards:** Individual and Barangay-level rankings
+- **Tasks:** Automated post generation upon task completion for community feed visibility
+- **Reports:**
+  - Real-time heatmap visualization,
+  - SMS reporting fallback for users without internet connectivity
+- **LGU Interface:** LGU dashboard for task creation, report management, and data monitoring
+- **Accessibility:** Multi-language support (Filipino, Hiligaynon, English) with accessibility features
+- **Partnerships:**
+  - Integration with PAGASA weather data for pre-emptive mission triggers
+  - Integration with the ICARE (Iloilo City Action and Response Center) dispatch system
+- National-level rollout outside the Panay Island pilot region
+
+
+## Quick Links
+
+
+**GitHub:** https://github.com/aether-voltix7/UPV-Hackathon-Team-AEGIS_PANIKASOG
+**Figma:** https://www.figma.com/design/21VUDwITmUnhC1aFwxEWPf/PANIKASOG-%7C-KOMSAI.HACK-2026?node-id=0-1&t=vdCP4EJTCwdHxvr6-1
+**Documentation (PDF):** (drive link)
+
 
 ## Tech Stack
+
 
 | Layer            | Technology                     |
 | ---------------- | ------------------------------ |
@@ -15,9 +57,45 @@
 | Maps             | Google Maps Flutter            |
 | Auth Providers   | Email/Password, Google Sign-In |
 
+
 ---
 
+
+## Modules Roadmap
+
+
+| Module             | Status            | Description                                   |
+| ------------------ | ----------------- | --------------------------------------------- |
+| 🔐 **Auth**        | ✅ **Done**       | Landing, Sign-up (2-step), Login, Google auth |
+| 🏠 **Home Feed**   | ✅ **Done**       | Post cards, filter chips, Urgent Tasks drawer |
+| 📋 **Tasks**       | ⏳ For Refinement | List, Detail, Timer, Verification, Rewards    |
+| 📍 **Reports**     | ⏳ For Refinement | Map view, Hazard categories, Create Report    |
+| 👤 **Profile**     | ✅ **Done**       | Tabs, Achievements, Stats, Edit profile       |
+| 🏆 **Leaderboard** | ⏳ For Refinement | Daily/Monthly rankings, Badges                |
+| 🎁 **Rewards**     | ✅ **Done**       | Points wallet, Partner redemption             |
+| ⚙️ **Settings**    | ✅ **Done**       | Accessibility, Theme, Notifications           |
+
+
+---
+
+
+## Installation
+
+
+1. Clone the repo
+   git clone https://github.com/aether-voltix7/UPV-Hackathon-Team-AEGIS_PANIKASOG.git
+
+
+2. Install dependencies
+   flutter pub get
+
+
+3. Run the app
+   flutter run
+
+
 ## Project Structure
+
 
 ```
 lib/
@@ -52,194 +130,16 @@ lib/
 │   │
 │   └── main_screen.dart         # Bottom nav shell + FAB overlay menu
 │
-├── firebase_options.dart        # ⚠️ Generate with flutterfire configure
+├── firebase_options.dart        # Generated with 'flutterfire configure'
 └── main.dart                    # App entry point + Provider setup + routing
 ```
 
----
-
-## Quick Start
-
-### 1. Clone & Install Dependencies
-
-```bash
-git clone <your-repo-url>
-cd panikasog
-flutter pub get
-```
-
-### 2. Firebase Setup
-
-#### 2a. Create a Firebase Project
-
-1. Go to [console.firebase.google.com](https://console.firebase.google.com)
-2. Create a new project named **panikasog** (or any name)
-3. Enable **Google Analytics** (optional but recommended)
-
-#### 2b. Enable Authentication
-
-In Firebase Console → Authentication → Sign-in method, enable:
-
-- ✅ **Email/Password**
-- ✅ **Google**
-
-#### 2c. Create Firestore Database
-
-In Firebase Console → Firestore Database:
-
-1. Click **Create Database**
-2. Choose **Start in production mode**
-3. Select a region (e.g., `asia-southeast1` for Philippines)
-4. Copy the contents of `firestore.rules` into the **Rules** tab
-
-#### 2d. Generate firebase_options.dart
-
-```bash
-# Install FlutterFire CLI (once)
-dart pub global activate flutterfire_cli
-
-# Configure (run from project root)
-flutterfire configure
-```
-
-Select your Firebase project and target platforms (Android/iOS).
-This auto-generates `lib/firebase_options.dart` with your real keys.
-
-#### 2e. Enable the Options in main.dart
-
-Open `lib/main.dart` and:
-
-1. Uncomment: `import 'firebase_options.dart';`
-2. Update the `Firebase.initializeApp()` call:
-
-```dart
-await Firebase.initializeApp(
-  options: DefaultFirebaseOptions.currentPlatform,
-);
-```
-
-### 3. Google Sign-In Setup (Android)
-
-1. In Firebase Console → Authentication → Sign-in method → Google → add your **Support email**
-2. Download `google-services.json` and place it at:
-   `android/app/google-services.json`
-3. Get your SHA-1 fingerprint:
-
-   ```bash
-   cd android
-   ./gradlew signingReport
-   ```
-
-   (or if it doesn't work, try this:)
-
-   ```bash
-   keytool -list -v -keystore "$env:USERPROFILE\.android\debug.keystore" -alias androiddebugkey -storepass android -keypass android
-   ```
-
-4. Add the SHA-1 to Firebase Console → Project Settings → Your Android App
-
-### 4. Google Maps API Key
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials
-2. Create an **API Key** and restrict it to the **Maps SDK for Android / iOS**
-3. Replace `YOUR_GOOGLE_MAPS_API_KEY` in `android/app/src/main/AndroidManifest.xml`
-4. For iOS, add to `ios/Runner/AppDelegate.swift`:
-
-```swift
-GMSServices.provideAPIKey("YOUR_GOOGLE_MAPS_API_KEY")
-```
-
-### 5. Run the App
-
-```bash
-flutter run
-```
-
----
-
-## Auth Flow
-
-```
-LandingScreen (carousel)
-    │
-    ├── [Sign Up] ──► SignupStep1Screen (Email + Phone + Password)
-    │                       │
-    │                       └── [Next →] ──► SignupStep2Screen (Profile + Skills)
-    │                                               │
-    │                                               └── [Finish Sign up] ──► MainScreen
-    │
-    └── [Login] ──► LoginScreen ──► MainScreen
-```
-
-### Referral Code Logic
-
-- Every user gets a unique 8-character code generated on signup (e.g. `A1B2C3D4`)
-- When a new user enters a referral code:
-  - New user gets **+100 points** immediately
-  - Referrer also gets **+100 points** (via Firestore update)
-- Invalid codes are silently ignored (no crash)
-
----
-
-## Firestore Data Model
-
-### `/users/{uid}`
-
-```json
-{
-  "email": "juan@email.com",
-  "phoneNumber": "+639123456789",
-  "name": "Juan Dela Cruz",
-  "username": "juan_01",
-  "address": "Brgy. Mainis, Iloilo City",
-  "skills": ["First Aid", "Driving"],
-  "preferredTasks": ["Emergency Response", "Cleanup & Recovery"],
-  "referralCode": "JUAN8X4Z",
-  "usedReferralCode": null,
-  "points": 100,
-  "jobsTaken": 0,
-  "jobsFinished": 0,
-  "avatarUrl": null,
-  "level": "Community Member",
-  "levelProgress": 0,
-  "dateJoined": "2026-03-25T00:00:00Z",
-  "badges": []
-}
-```
-
----
-
-## Environment Variables
-
-Never commit real keys. Use these placeholder patterns:
-
-| Key                        | Where                                                          |
-| -------------------------- | -------------------------------------------------------------- |
-| Firebase Config            | Generated by `flutterfire configure` → `firebase_options.dart` |
-| Google Maps Key            | `AndroidManifest.xml` + `AppDelegate.swift`                    |
-| `google-services.json`     | `android/app/` (git-ignored)                                   |
-| `GoogleService-Info.plist` | `ios/Runner/` (git-ignored)                                    |
-
----
-
-## Modules Roadmap
-
-| Module             | Status      | Description                                   |
-| ------------------ | ----------- | --------------------------------------------- |
-| 🔐 **Auth**        | ✅ **Done** | Landing, Sign-up (2-step), Login, Google auth |
-| 🏠 **Home Feed**   | ⏳ Next     | Post cards, filter chips, Urgent Tasks drawer |
-| 📋 **Tasks**       | ⏳ Planned  | List, Detail, Timer, Verification, Rewards    |
-| 📍 **Reports**     | ⏳ Planned  | Map view, Hazard categories, Create Report    |
-| 👤 **Profile**     | ⏳ Planned  | Tabs, Achievements, Stats, Edit profile       |
-| 🏆 **Leaderboard** | ⏳ Planned  | Daily/Monthly rankings, Badges                |
-| 🎁 **Rewards**     | ⏳ Planned  | Points wallet, Partner redemption             |
-| ⚙️ **Settings**    | ⏳ Planned  | Accessibility, Theme, Notifications           |
-
----
 
 ## Design System
 
+
 ### Colors
+
 
 ```dart
 AppColors.primary       // #B1004E  — Deep Magenta (main brand)
@@ -251,18 +151,24 @@ AppColors.chipBg        // #FCE4EC  — Chip backgrounds
 AppColors.referralBg    // #FFEBF3  — Referral section tint
 ```
 
+
 ### Typography
 
+
 All text uses **Poppins**. Add the font files to `assets/fonts/`:
+
 
 - `Poppins-Regular.ttf`
 - `Poppins-Medium.ttf`
 - `Poppins-SemiBold.ttf`
 - `Poppins-Bold.ttf`
 
+
 Download from [Google Fonts](https://fonts.google.com/specimen/Poppins).
 
+
 ### Reusable Widgets
+
 
 ```dart
 // Buttons
@@ -270,8 +176,10 @@ AppButton(label: 'Log in', onPressed: ...) // primary
 AppButton(label: 'Login', variant: ButtonVariant.outline, ...)
 AppButton(label: 'Google', variant: ButtonVariant.social, prefixIcon: ...)
 
+
 // Text Fields
 AppTextField(label: 'Email', hint: '...', controller: ..., validator: ...)
+
 
 // Chip Input
 ChipInputField(
@@ -281,21 +189,51 @@ ChipInputField(
   onChanged: (vals) => setState(() => _skills = vals),
 )
 
+
 // Logo
 AppLogo()           // standard
 AppLogo(darkBackground: true)  // for dark/gradient backgrounds
 ```
 
+
 ---
+
 
 ## Contributing
 
-1. Branch from `main`
-2. Use the feature-first folder structure
-3. Each screen should use a `Consumer<XProvider>` or `context.watch<XProvider>()`
-4. Keep business logic in `services/` and state in `providers/`
-5. Use `AppColors`, `AppTextStyles`, and `AppTheme` — no hardcoded styles
+
+Pull requests are welcome! For major changes, open an issue first.
+
 
 ---
 
+
+## Known Issues
+
+
+- Only supports Android for now
+- No LGU Interface yet
+- Searching location when creating a task
+- No SMS parsing yet
+- Partnerships for Rewards coming soon
+
+
+## License
+
+
+MIT License
+
+
+## Author
+
+
+Team AEGIS
+Developed for UPV’s Komsai Hack 2026: RiskReady
+
+
 _Built with ❤️ for communities in the Philippines and beyond._
+
+
+
+
+

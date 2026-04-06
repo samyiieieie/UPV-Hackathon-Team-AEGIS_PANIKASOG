@@ -308,7 +308,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           isUrgent: _isUrgent,
         );
     setState(() => _submitting = false);
-    if (!mounted) return;
+    if (!mounted) return; // ADDED
     if (success != null) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task created! 🎉'), backgroundColor: AppColors.success));
