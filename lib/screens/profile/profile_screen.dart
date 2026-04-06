@@ -16,7 +16,6 @@ import '../../services/post_service.dart';
 import '../../widgets/post_card.dart';
 import '../../services/user_progress_service.dart';
 
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   @override
@@ -46,7 +45,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     final user = context.read<AuthProvider>().user;
     if (user == null) return;
 
-    // Show loading
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Uploading...'), backgroundColor: AppColors.primary),
     );
@@ -131,16 +129,17 @@ class _ProfileScreenState extends State<ProfileScreen>
 // Profile header with avatar upload callback
 class _ProfileHeader extends StatelessWidget {
   final UserModel user;
-  const _ProfileHeader({required this.user});
+  final VoidCallback? onAvatarTap; // Added missing parameter
+  const _ProfileHeader({required this.user, this.onAvatarTap});
 
   int _nextLevelExp(int exp) {
-  for (int i = 0; i < LevelSystem.levels.length - 1; i++) {
-    if (exp < LevelSystem.levels[i + 1].expRequired) {
-      return LevelSystem.levels[i + 1].expRequired;
+    for (int i = 0; i < LevelSystem.levels.length - 1; i++) {
+      if (exp < LevelSystem.levels[i + 1].expRequired) {
+        return LevelSystem.levels[i + 1].expRequired;
+      }
     }
+    return LevelSystem.levels.last.expRequired;
   }
-  return LevelSystem.levels.last.expRequired;
-}
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +160,7 @@ class _ProfileHeader extends StatelessWidget {
             Positioned(
               bottom: 0, right: 0,
               child: GestureDetector(
-                onTap: onAvatarTap,
+                onTap: onAvatarTap, // Now correctly defined
                 child: Container(
                   width: 26, height: 26,
                   decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
