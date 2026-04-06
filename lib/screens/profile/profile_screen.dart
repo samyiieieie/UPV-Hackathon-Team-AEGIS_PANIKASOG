@@ -14,6 +14,8 @@ import '../../models/report_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/post_service.dart';
 import '../../widgets/post_card.dart';
+import '../../services/user_progress_service.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -129,8 +131,16 @@ class _ProfileScreenState extends State<ProfileScreen>
 // Profile header with avatar upload callback
 class _ProfileHeader extends StatelessWidget {
   final UserModel user;
-  final VoidCallback onAvatarTap;
-  const _ProfileHeader({required this.user, required this.onAvatarTap});
+  const _ProfileHeader({required this.user});
+
+  int _nextLevelExp(int exp) {
+  for (int i = 0; i < LevelSystem.levels.length - 1; i++) {
+    if (exp < LevelSystem.levels[i + 1].expRequired) {
+      return LevelSystem.levels[i + 1].expRequired;
+    }
+  }
+  return LevelSystem.levels.last.expRequired;
+}
 
   @override
   Widget build(BuildContext context) {
@@ -174,7 +184,7 @@ class _ProfileHeader extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(color: AppColors.chipBg, borderRadius: BorderRadius.circular(20)),
-              child: Text('Lvl 2 | ${user.level}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+              child: Text('Lvl ${LevelSystem.getLevelIndex(user.exp) + 1} | ${user.level}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
             ),
           ])),
           Column(children: [
@@ -183,16 +193,37 @@ class _ProfileHeader extends StatelessWidget {
           ]),
         ]),
         const SizedBox(height: 16),
-        LinearPercentIndicator(
-          lineHeight: 10, percent: (user.levelProgress / 100).clamp(0.0, 1.0),
-          backgroundColor: AppColors.borderGrey,
-          progressColor: AppColors.primary,
-          barRadius: const Radius.circular(5), padding: EdgeInsets.zero,
-          trailing: Padding(padding: const EdgeInsets.only(left: 8),
-            child: Text('${user.levelProgress}%', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600))),
+
+        // Level + EXP display
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(user.level, style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.primary, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            LinearPercentIndicator(
+              lineHeight: 10,
+              percent: (user.levelProgress / 100).clamp(0.0, 1.0),
+              backgroundColor: AppColors.borderGrey,
+              progressColor: AppColors.primary,
+              barRadius: const Radius.circular(5),
+              padding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${user.exp} / ${_nextLevelExp(user.exp)} EXP',
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+            ),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+
+        // Share / stats row
+        TextButton(
+          onPressed: () {},
+          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+          child: Text('Tap to share or view Rewards/Tasks/Reports →',
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary)),
         ),
-        const SizedBox(height: 4),
-        const Text('Level Progress', style: AppTextStyles.bodySmall),
       ]),
     );
   }
