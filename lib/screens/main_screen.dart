@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/constants/colors.dart';
 import 'home/home_screen.dart';
 import 'home/create_post_screen.dart';
@@ -7,6 +8,10 @@ import 'tasks/create_task_screen.dart';
 import 'reports/reports_screen.dart';
 import 'reports/create_report_screen.dart';
 import 'rankings/rankings_screen.dart';
+import '../providers/post_provider.dart';
+import '../providers/task_provider.dart';
+import '../services/post_service.dart';
+import '../services/task_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});

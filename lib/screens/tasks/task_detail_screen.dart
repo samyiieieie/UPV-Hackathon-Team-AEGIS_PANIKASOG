@@ -60,9 +60,6 @@ class TaskDetailScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Wrap(spacing: 6, children: task.tags.map((t) => _TagChip(label: t)).toList()),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // Tags
               Wrap(
                   spacing: 6,
@@ -131,7 +128,7 @@ class TaskDetailScreen extends StatelessWidget {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () => _navigateToMap(context),
                     style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: AppColors.primary),
                         shape: RoundedRectangleBorder(
@@ -189,17 +186,6 @@ class TaskDetailScreen extends StatelessWidget {
             backgroundColor: Colors.red),
       );
     }
-  }
-
-  void _navigateToMap(BuildContext context) {
-    // Replace with your map screen (OpenStreetMap)
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Map integration coming soon'), backgroundColor: AppColors.primary),
-    );
-  }
-
-  void _navigateToMap(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => TaskMapScreen(task: task)));
   }
 
   void _navigateToMap(BuildContext context) {
@@ -856,8 +842,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final _tagCtrl = TextEditingController();
   final _locationCtrl = TextEditingController(text: 'La Paz, Iloilo City');
   TaskCategory _category = TaskCategory.emergencyResponse;
-  final List<String> _tags = []; // made final
-  final List<File> _photos = []; // made final
+  final List<String> _tags = [];
+  final List<File> _photos = [];
   final FocusNode _locationFocus = FocusNode();
   bool _showMap = false;
   GoogleMapController? _mapController;
@@ -881,28 +867,22 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           _updateMarker(newPosition);
         },
       );
-      // This keeps the text field in sync with the pin
       _locationCtrl.text =
           "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
     });
   }
 
-  // auto-detect current location
   Future<void> _handleLocationDetection() async {
     try {
-      // 1. Check if GPS service is actually ON
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        // Prompt user to turn on GPS
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content:
-                  Text('Please enable location services in your settings.')),
+              content: Text('Please enable location services in your settings.')),
         );
         return;
       }
 
-      // 2. Handle Permissions
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -910,25 +890,21 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        // User has permanently denied, they'll need to go to app settings
         return;
       }
 
-      // 3. Get Position
-      _locationCtrl.text = "Detecting..."; // Show loading state
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      _locationCtrl.text = "Detecting...";
+      const locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+    );
+    Position position = await Geolocator.getCurrentPosition(
+      locationSettings: locationSettings,
+    );
 
-      // 4. Create LatLng object
       LatLng detectedLatLng = LatLng(position.latitude, position.longitude);
 
-      // 5. Update UI and Marker
       setState(() {
-        // This helper handles the Marker creation and the Text field update
         _updateMarker(detectedLatLng);
-
-        // Update Map's camera with a Zoom level (16 is good for street level)
         _mapController?.animateCamera(
           CameraUpdate.newLatLngZoom(detectedLatLng, 16),
         );
@@ -941,15 +917,12 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   Future<void> _searchLocation(String address) async {
     try {
-      // We use geo.locationFromAddress and geo.Location
       List<geo.Location> locations = await geo.locationFromAddress(address);
-
       if (locations.isNotEmpty) {
         final first = locations.first;
         LatLng newLatLng = LatLng(first.latitude, first.longitude);
-
         setState(() {
-          _updateMarker(newLatLng); // Move the red pin
+          _updateMarker(newLatLng);
           _mapController?.animateCamera(
             CameraUpdate.newLatLngZoom(newLatLng, 16),
           );
@@ -1157,7 +1130,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.gps_fixed,
                       color: AppColors.primary, size: 18),
-                  onPressed: _handleLocationDetection, // Link GPS function
+                  onPressed: _handleLocationDetection,
                 ),
               ),
             ),
@@ -1186,9 +1159,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                     },
                     myLocationEnabled: true,
                     onMapCreated: (controller) => _mapController = controller,
-                    // display the marker
                     markers: _pickedMarker != null ? {_pickedMarker!} : {},
-                    //  moves the pin as the user drags the map
                     onCameraMove: (CameraPosition position) {
                       _updateMarker(position.target);
                     },
@@ -1249,7 +1220,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
               Switch(
                 value: _isUrgent,
                 onChanged: (v) => setState(() => _isUrgent = v),
-                activeThumbColor: AppColors.primary, // fixed deprecated
+                activeThumbColor: AppColors.primary,
                 activeTrackColor: AppColors.primaryLight,
               ),
               const SizedBox(width: 8),

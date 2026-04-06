@@ -18,9 +18,6 @@ import 'services/post_service.dart';
 import 'providers/task_provider.dart';
 import 'services/task_service.dart';
 import 'providers/location_provider.dart';
-import 'providers/google_maps_provider.dart';
-import 'screens/home/example_maps_screen.dart';
-import 'screens/auth/google_sign_in_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

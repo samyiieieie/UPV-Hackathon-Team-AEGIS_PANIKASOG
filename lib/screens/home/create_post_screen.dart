@@ -168,9 +168,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       // 3. Get Position
       _locationCtrl.text = "Detecting..."; // Show loading state
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+     const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+    );
+    Position position = await Geolocator.getCurrentPosition(
+      locationSettings: locationSettings,
+    );
 
       // 4. Update UI
       setState(() {

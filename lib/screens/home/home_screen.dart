@@ -7,12 +7,11 @@ import '../../models/urgent_task_model.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/post_card.dart';
+import '../../widgets/vote_dialog.dart';
 import '../tasks/task_detail_screen.dart';
 import 'post_detail_screen.dart';
 import '../profile/profile_screen.dart';
 import '../settings/settings_screen.dart';
-// Note: If you have a custom app logo widget, import it here:
-// import '../../widgets/app_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +22,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollCtrl = ScrollController();
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+  FeedFilter _selectedFilter = FeedFilter.all;
+  bool _urgentExpanded = false;
 
   @override
   void initState() {
@@ -36,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scrollCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -43,6 +47,27 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_scrollCtrl.position.pixels >=
         _scrollCtrl.position.maxScrollExtent - 200) {
       context.read<PostProvider>().loadFeed();
+    }
+  }
+
+  List<PostModel> _filteredPosts(List<PostModel> allPosts) {
+    var filtered = allPosts;
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((p) =>
+          p.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          p.caption.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    }
+    switch (_selectedFilter) {
+      case FeedFilter.community:
+        return filtered.where((p) => p.category == PostCategory.community).toList();
+      case FeedFilter.verified:
+        return filtered.where((p) => p.authorIsVerified).toList();
+      case FeedFilter.tasks:
+        return filtered.where((p) => p.category == PostCategory.tasks).toList();
+      case FeedFilter.news:
+        return filtered.where((p) => p.category == PostCategory.news).toList();
+      default:
+        return filtered;
     }
   }
 
@@ -74,8 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final filteredPosts = _filteredPosts(allPosts);
     final urgentTasks = postProvider.urgentTasks;
 
-    // Use a very light pinkish-grey background based on the screenshot
-    final Color backgroundColor = const Color(0xFFFCF5F7); 
+    final Color backgroundColor = const Color(0xFFFCF5F7);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -85,14 +109,13 @@ class _HomeScreenState extends State<HomeScreen> {
         titleSpacing: 16,
         title: Row(
           children: [
-            // Replace Icon with your AppLogo() widget if it renders the graphic
-            const Icon(Icons.cyclone, color: Color(0xFFC2185B), size: 28), 
+            const Icon(Icons.cyclone, color: Color(0xFFC2185B), size: 28),
             const SizedBox(width: 8),
             Text(
-              'PANIKASOG', 
+              'PANIKASOG',
               style: AppTextStyles.h1.copyWith(
-                fontSize: 20, 
-                color: const Color(0xFFC2185B), // Deep pink/red logo color
+                fontSize: 20,
+                color: const Color(0xFFC2185B),
                 letterSpacing: 1.5,
               ),
             ),
@@ -101,8 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           GestureDetector(
             onTap: () {
-               // Assuming profile screen navigation
-               Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
             },
             child: CircleAvatar(
               radius: 16,
@@ -127,7 +149,6 @@ class _HomeScreenState extends State<HomeScreen> {
             color: const Color(0xFFC2185B),
             child: CustomScrollView(
               slivers: [
-                // "Home" Header Title
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -136,13 +157,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF5A2A66), // Deep purple/magenta
+                        color: const Color(0xFF5A2A66),
                       ),
                     ),
                   ),
                 ),
 
-                // Search bar and Filter Button Row
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   sliver: SliverToBoxAdapter(
@@ -177,11 +197,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 12),
                         Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF6B225E), // Purple background for icon
+                            color: const Color(0xFF6B225E),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF6B225E).withOpacity(0.3),
+                                color: const Color(0xFF6B225E).withValues(alpha: 0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               )
@@ -189,9 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           child: IconButton(
                             icon: const Icon(Icons.tune, color: Colors.white, size: 20),
-                            onPressed: () {
-                              // Handle filter opening
-                            },
+                            onPressed: () {},
                           ),
                         ),
                       ],
@@ -199,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // Filter chips
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   sliver: SliverToBoxAdapter(
@@ -242,7 +259,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // Posts feed
                 if (postProvider.isLoading && allPosts.isEmpty)
                   const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: Color(0xFFC2185B))))
                 else if (postProvider.error != null)
@@ -254,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(postProvider.error!, style: AppTextStyles.bodyMedium),
                           const SizedBox(height: 12),
                           ElevatedButton(
-                            onPressed: () => postProvider.loadFeed(refresh: true), 
+                            onPressed: () => postProvider.loadFeed(refresh: true),
                             child: const Text('Retry')
                           ),
                         ],
@@ -274,8 +290,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             post: post,
                             currentUserId: auth.user?.uid,
                             userVote: postProvider.userVoteFor(post.id),
-                            onUpvote: () => postProvider.vote(postId: post.id, userId: auth.user?.uid ?? '', voteType: 'up'),
-                            onDownvote: () => postProvider.vote(postId: post.id, userId: auth.user?.uid ?? '', voteType: 'down'),
+                            onUpvote: () => _handleVote(context, post, 'up'),
+                            onDownvote: () => _handleVote(context, post, 'down'),
                             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(post: post))),
                           ),
                         );
@@ -283,14 +299,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       childCount: filteredPosts.length,
                     ),
                   ),
-                  
-                  // Add bottom padding to prevent items from hiding behind the Urgent Tasks bottom sheet
-                  const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+
+                const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
               ],
             ),
           ),
 
-          // Collapsible Urgent Tasks section (Floating at bottom as in image)
           if (urgentTasks.isNotEmpty)
             Align(
               alignment: Alignment.bottomCenter,
@@ -306,7 +320,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Collapsible widget redesigned to match screenshot (White, top-rounded)
 class _UrgentCollapsible extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
@@ -322,11 +335,11 @@ class _UrgentCollapsible extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white, 
+        color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),
@@ -335,7 +348,6 @@ class _UrgentCollapsible extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header (always visible)
           GestureDetector(
             onTap: onToggle,
             child: Container(
@@ -349,7 +361,7 @@ class _UrgentCollapsible extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: Color(0xFFC2185B), // Magenta circle
+                      color: Color(0xFFC2185B),
                       shape: BoxShape.circle,
                     ),
                     child: AnimatedRotation(
@@ -365,14 +377,13 @@ class _UrgentCollapsible extends StatelessWidget {
                       fontFamily: 'Poppins',
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF5A2A66), // Dark purple text
+                      color: Color(0xFF5A2A66),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          // Expanded content
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 300),
             crossFadeState: expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
@@ -401,7 +412,6 @@ class _UrgentCollapsible extends StatelessWidget {
   }
 }
 
-// Individual urgent task tile - adapted to light theme
 class _UrgentTaskTile extends StatelessWidget {
   final UrgentTaskModel task;
   const _UrgentTaskTile({required this.task});
@@ -484,7 +494,7 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFFC2185B); // Match magenta in screenshot
+    final activeColor = const Color(0xFFC2185B);
 
     return GestureDetector(
       onTap: onSelected,
