@@ -26,7 +26,7 @@ class PostService {
 
   // ─── Create Post ───────────────────────────────────────────────────────────
 
-  Future<PostModel> createPost({
+    Future<PostModel> createPost({
     required String authorId,
     required String authorUsername,
     String? authorAvatarUrl,
@@ -39,16 +39,17 @@ class PostService {
     required List<String> tags,
     required PostCategory category,
     bool isUrgent = false,
-    List<String> urgentReasons = const [],
+    List<String> urgentReasons = const [], // ← add this
+    List<File> imageFiles = const [],
   }) async {
-    String? imageUrl;
+    List<String> imageUrls = [];
 
-    if (imageFile != null) {
+    for (int i = 0; i < imageFiles.length; i++) {
       final ref = FirebaseStorage.instance.ref(
-        'posts/${DateTime.now().millisecondsSinceEpoch}_$authorId.jpg',
+        'posts/${DateTime.now().millisecondsSinceEpoch}_${i}_$authorId.jpg',
       );
-      await ref.putFile(imageFile);
-      imageUrl = await ref.getDownloadURL();
+      await ref.putFile(imageFiles[i]);
+      imageUrls.add(await ref.getDownloadURL());
     }
 
     final docRef = _db.collection('posts').doc();
@@ -62,11 +63,12 @@ class PostService {
       city: city,
       title: title,
       caption: caption,
-      imageUrl: imageUrl,
+      imageUrl: imageUrls.isNotEmpty ? imageUrls.first : null,
+      imageUrls: imageUrls,
       tags: tags,
       category: category,
       isUrgent: isUrgent,
-      urgentReasons: urgentReasons,
+      urgentReasons: urgentReasons, // ← fixed
       createdAt: DateTime.now(),
     );
     await docRef.set(post.toFirestore());
@@ -137,7 +139,7 @@ class PostService {
         .collection('tasks')
         .where('isUrgent', isEqualTo: true)
         .where('status', isEqualTo: 'open')
-        .orderBy('scheduledAt')
+        .orderBy('scheduledStart') // ← matches TaskModel field name
         .limit(10)
         .snapshots()
         .map((snap) => snap.docs
@@ -193,6 +195,7 @@ class PostService {
   static List<UrgentTaskModel> get mockUrgentTasks => [
         UrgentTaskModel(
           id: 'utask_1',
+          taskId: 'task_1',
           title: 'Medical Assistance for Injured Individuals...',
           barangay: 'Brgy. Rizal',
           city: 'Iloilo City',
@@ -210,4 +213,16 @@ class PostService {
           isVerifiedUrgent: true,
         ),
       ];
+
+      // ─── User Posts ───────────────────────────────────────────
+
+        Future<List<PostModel>> getPostsByUser(String userId) async {
+      final snapshot = await _db
+          .collection('posts')
+          .where('authorId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
+    }
 }
+

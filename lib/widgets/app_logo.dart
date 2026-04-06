@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/constants/colors.dart';
-import '../core/constants/text_styles.dart';
+// import '../core/constants/text_styles.dart';
 
 class AppLogo extends StatelessWidget {
   final double iconSize;
@@ -14,25 +14,18 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = darkBackground ? AppColors.white : AppColors.primary;
+    // final color = darkBackground ? AppColors.white : AppColors.primary;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Logo
-        Container(
-          width: iconSize,
-          height: iconSize,
-          color: Colors.transparent,
+        SizedBox(
+          width: 200,
           child: Image.asset(
             'assets/images/panikasog-logo.png',
             fit: BoxFit.contain,
           ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'PANIKASOG',
-          style: AppTextStyles.logoText.copyWith(color: color),
-        ),
+        )
       ],
     );
   }

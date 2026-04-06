@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../models/task_model.dart';
+import '../tasks/task_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
@@ -8,7 +11,6 @@ import '../../providers/post_provider.dart';
 import '../../widgets/post_card.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/urgent_tasks_drawer.dart';
-import '../../widgets/vote_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,18 +50,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final userId = authProvider.user?.uid;
     if (userId == null) return;
 
-    final confirmed = await showVoteDialog(
-      context: context,
-      post: post,
-      voteType: voteType,
-    );
-    if (confirmed == true && context.mounted) {
-      await context.read<PostProvider>().vote(
-            postId: post.id,
-            userId: userId,
-            voteType: voteType,
-          );
-    }
+    await context.read<PostProvider>().vote(
+          postId: post.id,
+          userId: userId,
+          voteType: voteType,
+        );
   }
 
   @override
@@ -220,8 +215,37 @@ class _HomeBody extends StatelessWidget {
             tasks: postProvider.urgentTasks,
             isExpanded: postProvider.urgentDrawerExpanded,
             onToggle: postProvider.toggleUrgentDrawer,
-            onTaskTap: (task) =>
-                Navigator.pushNamed(context, '/tasks/${task.id}'),
+            onTaskTap: (task) async {
+              // First try Firestore
+              final doc = await FirebaseFirestore.instance
+                  .collection('tasks')
+                  .doc(task.taskId)
+                  .get();
+              if (!context.mounted) return;
+
+              TaskModel? fullTask;
+              if (doc.exists) {
+                fullTask = TaskModel.fromFirestore(doc);
+              } else {
+                // Fall back to mock tasks (for development)
+                fullTask = TaskModel.mockTasks
+                    .where((t) => t.id == task.taskId)
+                    .firstOrNull;
+              }
+
+              if (fullTask != null && context.mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TaskDetailScreen(task: fullTask!),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Task details not found.')),
+                );
+              }
+            },
           ),
         ),
       ],
