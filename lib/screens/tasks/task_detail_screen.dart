@@ -979,7 +979,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   bool _showMap = false;
   GoogleMapController? _mapController;
   Marker? _pickedMarker;
-  LatLng _currentLatLng = const LatLng(10.7202, 122.5621);
+  static const LatLng _iloiloDefaultLoc = LatLng(10.7202, 122.5621);
   int _points = 100;
   int _volunteers = 5;
   bool _isUrgent = false;
@@ -987,28 +987,55 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   DateTime _startDate = DateTime.now().add(const Duration(hours: 2));
   DateTime _endDate = DateTime.now().add(const Duration(hours: 6));
 
-  void _updateMarker(LatLng position) {
+  // Update pin on the map, converts coordinates to a Barangay name
+  Future<void> _updateMarker(LatLng position) async {
+    // Update the visual marker first
     setState(() {
-      _currentLatLng = position;
       _pickedMarker = Marker(
         markerId: const MarkerId('picked_location'),
         position: position,
-        draggable: true,
-        onDragEnd: _updateMarker,
       );
-      _locationCtrl.text =
-          '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
     });
+
+    try {
+      // Convert Lat/Long to Address list
+      List<geo.Placemark> placemarks = await geo.placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        geo.Placemark place = placemarks.first;
+
+        // Construct a PH-friendly address: "Brgy, City"
+        String barangay = place.subLocality ?? place.name ?? "Unknown Brgy";
+        String city = place.locality ?? "Iloilo City";
+
+        setState(() {
+          _locationCtrl.text = "$barangay, $city";
+        });
+      }
+    } catch (e) {
+      // Fallback: If internet fails, show coordinates
+      debugPrint("Reverse Geocoding failed: $e");
+      setState(() {
+        _locationCtrl.text =
+            "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
+      });
+    }
   }
 
+  // auto-detect current location and perform Reverse Geocoding
   Future<void> _handleLocationDetection() async {
     try {
+      // 1. Check if GPS is ON
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Please enable location services.')));
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Please enable location services in settings.')),
+        );
         return;
       }
       LocationPermission permission = await Geolocator.checkPermission();
@@ -1016,39 +1043,92 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) return;
       }
-      if (permission == LocationPermission.deniedForever) return;
 
-      _locationCtrl.text = 'Detecting...';
-      final position = await Geolocator.getCurrentPosition(
-          locationSettings:
-              const LocationSettings(accuracy: LocationAccuracy.high));
-      final latlng = LatLng(position.latitude, position.longitude);
-      setState(() {
-        _updateMarker(latlng);
-        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latlng, 16));
-      });
+      if (permission == LocationPermission.deniedForever) {
+        // Direct user to settings if they blocked it permanently
+        return;
+      }
+
+      // 3. Get Position
+      setState(() => _locationCtrl.text = "Detecting address...");
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // 4. Create LatLng object
+      LatLng detectedLatLng = LatLng(position.latitude, position.longitude);
+
+      if (_mapController != null) {
+        try {
+          await _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(detectedLatLng, 16),
+          );
+        } catch (e) {
+          debugPrint("GPS Camera move failed: $e");
+        }
+      }
+
+      // 5. Trigger the Marker update AND Name Lookup
+      await _updateMarker(detectedLatLng);
     } catch (e) {
-      _locationCtrl.text = 'Error detecting location';
+      debugPrint("GPS Error: $e");
+      if (mounted) {
+        setState(() => _locationCtrl.text = "Error detecting location");
+      }
     }
   }
 
-  Future<void> _searchLocation(String address) async {
+  Future<void> _searchLocation(String query) async {
+    if (query.isEmpty) return;
+
     try {
-      final locations = await geo.locationFromAddress(address);
+      // search for a location in Iloilo
+      String fullQuery = "$query, Iloilo City, Philippines";
+      debugPrint("Searching for: $fullQuery");
+
+      List<geo.Location> locations = await geo.locationFromAddress(fullQuery);
+      if (!mounted) return;
+
       if (locations.isNotEmpty) {
-        final latlng =
+        final target =
             LatLng(locations.first.latitude, locations.first.longitude);
-        setState(() {
-          _updateMarker(latlng);
-          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latlng, 16));
-        });
+        debugPrint("Location found: ${target.latitude}, ${target.longitude}");
+
+        if (_mapController != null) {
+          try {
+            await _mapController!.animateCamera(
+              CameraUpdate.newLatLngZoom(target, 16),
+            );
+          } catch (e) {
+            debugPrint("Map animation failed (probably disposed): $e");
+          }
+        }
+
+        // 2. Move the Camera
+        if (_mapController != null) {
+          _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(target, 16),
+          );
+        } else {
+          debugPrint("Map Controller is NULL!");
+        }
+
+        // 3. Update the Marker and the Input Box text
+        await _updateMarker(target);
+      } else {
+        _showError("No results found for '$query'");
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not find location: "$address"')));
-      }
+      debugPrint("Geocoding Error: $e");
+      if (mounted) _showError("Location search failed. Check internet.");
     }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+    );
   }
 
   @override
@@ -1060,6 +1140,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   @override
   void dispose() {
+    _mapController?.dispose();
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _tagCtrl.dispose();
@@ -1237,14 +1318,20 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                        target: _currentLatLng, zoom: 14),
+                    initialCameraPosition: const CameraPosition(
+                      target: _iloiloDefaultLoc,
+                      zoom: 14,
+                    ),
                     gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
                       Factory<OneSequenceGestureRecognizer>(
                           () => EagerGestureRecognizer()),
                     },
                     myLocationEnabled: true,
-                    onMapCreated: (c) => _mapController = c,
+                    onMapCreated: (controller) {
+                      if (!mounted) return;
+                      _mapController = controller;
+                    },
+                    // display the marker
                     markers: _pickedMarker != null ? {_pickedMarker!} : {},
                     onCameraMove: (p) => _updateMarker(p.target),
                   ),
