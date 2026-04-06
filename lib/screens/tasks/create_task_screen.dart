@@ -6,6 +6,7 @@ import '../../core/constants/text_styles.dart';
 import '../../models/task_model.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/location_service.dart';
 
 class CreateTaskScreen extends StatefulWidget {
   const CreateTaskScreen({super.key});
@@ -36,6 +37,21 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     _tagCtrl.dispose();
     _locationCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _verifyLocation() async {
+    final address = _locationCtrl.text.trim();
+    if (address.isEmpty) return;
+    final coords = await LocationService().getCoordinatesFromAddress(address);
+    if (coords == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location not found. Please enter a valid address.'), backgroundColor: Colors.red),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location verified!'), backgroundColor: AppColors.success),
+      );
+    }
   }
 
   @override
@@ -69,10 +85,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Photo placeholder
               Container(
-                width: double.infinity,
-                height: 130,
+                width: double.infinity, height: 130,
                 decoration: BoxDecoration(
                   color: AppColors.lightGrey,
                   borderRadius: BorderRadius.circular(16),
@@ -154,11 +168,17 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 ),
               ],
               const SizedBox(height: 16),
-              _FieldLabel(label: 'Location (Auto-detected)'),
+              _FieldLabel(label: 'Location (Barangay, City)'),
               TextFormField(
                 controller: _locationCtrl,
                 style: AppTextStyles.inputText,
-                decoration: const InputDecoration(suffixIcon: Icon(Icons.gps_fixed, color: AppColors.primary, size: 18)),
+                decoration: InputDecoration(
+                  hintText: 'e.g., La Paz, Iloilo City',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search, color: AppColors.primary),
+                    onPressed: _verifyLocation,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               Row(

@@ -78,7 +78,8 @@ class UserModel {
     return {
       'email': email,
       'phoneNumber': phoneNumber,
-      'name': name,
+      'firstName': firstName,
+      'lastName': lastName,
       'username': username,
       'address': address,
       'skills': skills,
@@ -91,6 +92,7 @@ class UserModel {
       'avatarUrl': avatarUrl,
       'level': level,
       'levelProgress': levelProgress,
+      'exp': exp,
       'dateJoined': Timestamp.fromDate(dateJoined),
       'badges': badges,
     };

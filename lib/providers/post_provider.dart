@@ -14,8 +14,6 @@ class PostProvider extends ChangeNotifier {
     _listenUrgentTasks();
   }
 
-  
-
   // ─── Feed state ────────────────────────────────────────────────────────────
   List<PostModel> _posts = [];
   bool _isLoading = false;
@@ -47,29 +45,29 @@ class PostProvider extends ChangeNotifier {
   // ─── Load / Refresh ────────────────────────────────────────────────────────
 
   Future<void> loadFeed({bool refresh = false}) async {
-  if (_isLoading) return;
-  if (refresh) {
-    _posts = [];
-    _hasMore = true;
-  }
-  if (!_hasMore) return;
+    if (_isLoading) return;
+    if (refresh) {
+      _posts = [];
+      _hasMore = true;
+    }
+    if (!_hasMore) return;
 
-  _isLoading = true;
-  _error = null;
-  notifyListeners();
-
-  try {
-    final snapshot = await _service.feedQuery().get();
-    _posts = snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
-    _posts.addAll(PostService.mockPosts); // mock posts
-    _hasMore = false;
-  } catch (e) {
-    _error = 'Failed to load posts. Pull to refresh.';
-  } finally {
-    _isLoading = false;
+    _isLoading = true;
+    _error = null;
     notifyListeners();
+
+    try {
+      final snapshot = await _service.feedQuery().get();
+      _posts = snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
+      _posts.addAll(PostService.mockPosts);
+      _hasMore = false;
+    } catch (e) {
+      _error = 'Failed to load posts. Pull to refresh.';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
-}
 
   // ─── Filtering ─────────────────────────────────────────────────────────────
 
@@ -114,8 +112,7 @@ class PostProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _service.vote(
-          postId: postId, userId: userId, voteType: voteType);
+      await _service.vote(postId: postId, userId: userId, voteType: voteType);
     } catch (_) {
       // Roll back on error
       _posts[index] = post;
@@ -126,13 +123,12 @@ class PostProvider extends ChangeNotifier {
 
   // ─── Urgent Tasks ──────────────────────────────────────────────────────────
 
-    void _listenUrgentTasks() {
+  void _listenUrgentTasks() {
     _service.urgentTasksStream().listen((tasks) {
-      final mockIds = PostService.mockUrgentTasks.map((t) => t.id).toSet();
+      // Removed unused mockIds variable
       final liveIds = tasks.map((t) => t.id).toSet();
       _urgentTasks = [
         ...tasks,
-        // only add mocks that don't clash with live data
         ...PostService.mockUrgentTasks.where((t) => !liveIds.contains(t.id)),
       ];
       notifyListeners();
@@ -149,47 +145,47 @@ class PostProvider extends ChangeNotifier {
 
   // ─── Create Post ───────────────────────────────────────────────────────────
   Future<PostModel?> createPost({
-  required String authorId,
-  required String authorUsername,
-  String? authorAvatarUrl,
-  bool authorIsVerified = false,
-  required String barangay,
-  required String city,
-  required String title,
-  required String caption,
-  File? imageFile,
-  List<File> imageFiles = const [], // ← receives from screen
-  required List<String> tags,
-  required PostCategory category,
-}) async {
-  _isCreatingPost = true;
-  notifyListeners();
+    required String authorId,
+    required String authorUsername,
+    String? authorAvatarUrl,
+    bool authorIsVerified = false,
+    required String barangay,
+    required String city,
+    required String title,
+    required String caption,
+    File? imageFile,
+    List<File> imageFiles = const [],
+    required List<String> tags,
+    required PostCategory category,
+  }) async {
+    _isCreatingPost = true;
+    notifyListeners();
 
-  try {
-    final post = await _service.createPost(
-      authorId: authorId,
-      authorUsername: authorUsername,
-      authorAvatarUrl: authorAvatarUrl,
-      authorIsVerified: authorIsVerified,
-      barangay: barangay,
-      city: city,
-      title: title,
-      caption: caption,
-      imageFile: imageFiles.isNotEmpty ? imageFiles.first : imageFile, // ← use parameter
-      imageFiles: imageFiles, // ← use parameter
-      tags: tags,
-      category: category,
-    );
-    _posts.insert(0, post);
-    notifyListeners();
-    return post;
-  } catch (e) {
-    _error = 'Failed to create post. Please try again.';
-    notifyListeners();
-    return null;
-  } finally {
-    _isCreatingPost = false;
-    notifyListeners();
+    try {
+      final post = await _service.createPost(
+        authorId: authorId,
+        authorUsername: authorUsername,
+        authorAvatarUrl: authorAvatarUrl,
+        authorIsVerified: authorIsVerified,
+        barangay: barangay,
+        city: city,
+        title: title,
+        caption: caption,
+        imageFile: imageFiles.isNotEmpty ? imageFiles.first : imageFile,
+        imageFiles: imageFiles,
+        tags: tags,
+        category: category,
+      );
+      _posts.insert(0, post);
+      notifyListeners();
+      return post;
+    } catch (e) {
+      _error = 'Failed to create post. Please try again.';
+      notifyListeners();
+      return null;
+    } finally {
+      _isCreatingPost = false;
+      notifyListeners();
+    }
   }
-}
 }

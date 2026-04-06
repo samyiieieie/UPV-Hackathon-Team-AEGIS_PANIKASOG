@@ -1,9 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+<<<<<<< HEAD
+=======
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:io';
+>>>>>>> f453acc9dd7bcf9d2a54b433b3f07a267fb8ce57
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../../models/report_model.dart';
@@ -90,6 +93,9 @@ class _MapView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
+    return const Center(child: Text('Map view coming soon – use OpenStreetMap integration', style: AppTextStyles.bodySmall));
+=======
     // first, ReportModel list is converted to Google Map Markers
     final Set<Marker> markers = reports
         .where((report) =>
@@ -130,6 +136,7 @@ class _MapView extends StatelessWidget {
         // You can save the controller if you want to animate to specific pins later
       },
     );
+>>>>>>> f453acc9dd7bcf9d2a54b433b3f07a267fb8ce57
   }
 }
 
@@ -249,6 +256,9 @@ class _ReportCard extends StatelessWidget {
       ]),
     );
   }
+<<<<<<< HEAD
+}
+=======
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -294,17 +304,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
             icon: const Icon(Icons.arrow_back_ios_new,
                 color: AppColors.primary, size: 20),
             onPressed: () => Navigator.pop(context)),
-        title: Row(children: [
-          Container(
-              width: 28,
-              height: 28,
-              decoration: const BoxDecoration(
-                  color: AppColors.chipBg, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_back_ios_new,
-                  size: 12, color: AppColors.primary)),
-          const SizedBox(width: 8),
-          const Text('Create a Report', style: AppTextStyles.h2),
-        ]),
+        title: const Text('Create a Report', style: AppTextStyles.h2),
       ),
       body: Form(
         key: _formKey,
@@ -606,3 +606,4 @@ class _HazardCategoryTile extends StatelessWidget {
     ]);
   }
 }
+>>>>>>> f453acc9dd7bcf9d2a54b433b3f07a267fb8ce57

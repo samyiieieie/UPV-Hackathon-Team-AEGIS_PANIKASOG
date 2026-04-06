@@ -14,6 +14,7 @@ import '../../core/constants/text_styles.dart';
 import '../../models/task_model.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/auth_provider.dart';
+import 'task_map_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TASK DETAIL SCREEN
@@ -40,7 +41,6 @@ class TaskDetailScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Hero image / placeholder
           Container(
             width: double.infinity,
             height: 200,
@@ -57,9 +57,10 @@ class TaskDetailScreen extends StatelessWidget {
                             style: AppTextStyles.bodySmall),
                       ]),
           ),
-
           Padding(
             padding: const EdgeInsets.all(20),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Wrap(spacing: 6, children: task.tags.map((t) => _TagChip(label: t)).toList()),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // Tags
@@ -67,8 +68,6 @@ class TaskDetailScreen extends StatelessWidget {
                   spacing: 6,
                   children: task.tags.map((t) => _TagChip(label: t)).toList()),
               const SizedBox(height: 12),
-
-              // Title
               Text(task.title, style: AppTextStyles.h1),
               const SizedBox(height: 8),
 
@@ -87,8 +86,6 @@ class TaskDetailScreen extends StatelessWidget {
                   text:
                       '${task.volunteersAccepted} / ${task.volunteersNeeded} volunteers'),
               const SizedBox(height: 16),
-
-              // Points card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -111,14 +108,10 @@ class TaskDetailScreen extends StatelessWidget {
                 ]),
               ),
               const SizedBox(height: 16),
-
-              // Description
               const Text('Description', style: AppTextStyles.h3),
               const SizedBox(height: 6),
               Text(task.description, style: AppTextStyles.bodyMedium),
               const SizedBox(height: 28),
-
-              // Action buttons
               if (isOpen) ...[
                 SizedBox(
                   width: double.infinity,
@@ -206,10 +199,11 @@ class TaskDetailScreen extends StatelessWidget {
   }
 
   void _navigateToMap(BuildContext context) {
-    // Replace with your map screen (OpenStreetMap)
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Map integration coming soon'), backgroundColor: AppColors.primary),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => TaskMapScreen(task: task)));
+  }
+
+  void _navigateToMap(BuildContext context) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => TaskMapScreen(task: task)));
   }
 
   IconData _categoryIcon(TaskCategory cat) {
@@ -497,7 +491,12 @@ class _TaskProgressScreenState extends State<TaskProgressScreen> {
             child: ElevatedButton(
               onPressed: () async {
                 final userId = context.read<AuthProvider>().user?.uid ?? '';
-                await context.read<TaskProvider>().completeTask(widget.task.id, userId, widget.task.points);
+                await context.read<TaskProvider>().submitVerification(
+                  taskId: widget.task.id,
+                  userId: userId,
+                  taskPoints: widget.task.points,
+                  note: 'Task completed',
+                );
                 if (!context.mounted) return;
                 Navigator.pushReplacement(
                     context,
@@ -732,11 +731,11 @@ class _TaskVerificationScreenState extends State<TaskVerificationScreen> {
     setState(() => _submitting = true);
     final userId = context.read<AuthProvider>().user?.uid ?? '';
     await context.read<TaskProvider>().submitVerification(
-          taskId: widget.task.id,
-          userId: userId,
-          note: _noteCtrl.text.trim(),
-        );
-    await context.read<AuthProvider>().refreshUser();
+      taskId: widget.task.id,
+      userId: userId,
+      taskPoints: widget.task.points,
+      note: _noteCtrl.text.trim(),
+    );
     setState(() => _submitting = false);
     if (!context.mounted) return;
     Navigator.push(

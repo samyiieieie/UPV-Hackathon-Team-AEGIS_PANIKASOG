@@ -145,14 +145,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Refresh User ─────────────────────────────────────────────────────────
-Future<void> refreshUser() async {
-  final model = await _authService.getCurrentUserModel();
-  if (model != null) {
-    _user = model;
-    notifyListeners();
+  // ─── Refresh User (single definition) ─────────────────────────────────────
+  Future<void> refreshUser() async {
+    final model = await _authService.getCurrentUserModel();
+    if (model != null) {
+      _user = model;
+      notifyListeners();
+    }
   }
-}
 
   Future<bool> sendPasswordReset(String email) async {
     _setLoading();
@@ -164,14 +164,6 @@ Future<void> refreshUser() async {
     } on FirebaseAuthException catch (e) {
       _setError(_mapFirebaseError(e));
       return false;
-    }
-  }
-
-  Future<void> refreshUser() async {
-    final newUser = await _authService.getCurrentUserModel();
-    if (newUser != null) {
-      _user = newUser;
-      notifyListeners();
     }
   }
 

@@ -172,6 +172,26 @@ class AuthService {
     await _auth.sendPasswordResetEmail(email: email);
   }
 
+  // ─── Change Password (NEW) ───────────────────────────────────────────────
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No user logged in');
+    if (user.email == null) throw Exception('No email associated with this account');
+
+    // Re-authenticate user
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: currentPassword,
+    );
+    await user.reauthenticateWithCredential(credential);
+
+    // Update password
+    await user.updatePassword(newPassword);
+  }
+
   String _generateReferralCode(String uid) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final rng = Random.secure();

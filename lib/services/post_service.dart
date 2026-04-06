@@ -24,9 +24,8 @@ class PostService {
     return PostModel.fromFirestore(doc);
   }
 
-  // ─── Create Post (with improved image upload error handling) ───────────────
-
-    Future<PostModel> createPost({
+  // ─── Create Post (fixed image upload) ──────────────────────────────────────
+  Future<PostModel> createPost({
     required String authorId,
     required String authorUsername,
     String? authorAvatarUrl,
@@ -39,17 +38,29 @@ class PostService {
     required List<String> tags,
     required PostCategory category,
     bool isUrgent = false,
-    List<String> urgentReasons = const [], // ← add this
+    List<String> urgentReasons = const [],
     List<File> imageFiles = const [],
   }) async {
     List<String> imageUrls = [];
 
+    // Handle single imageFile (backward compatibility)
     if (imageFile != null) {
       final ref = FirebaseStorage.instance.ref(
         'posts/${DateTime.now().millisecondsSinceEpoch}_$authorId.jpg',
       );
       await ref.putFile(imageFile);
-      imageUrl = await ref.getDownloadURL();
+      final url = await ref.getDownloadURL();
+      imageUrls.add(url);
+    }
+
+    // Handle multiple imageFiles
+    for (final file in imageFiles) {
+      final ref = FirebaseStorage.instance.ref(
+        'posts/${DateTime.now().millisecondsSinceEpoch}_${file.hashCode}.jpg',
+      );
+      await ref.putFile(file);
+      final url = await ref.getDownloadURL();
+      imageUrls.add(url);
     }
 
     final docRef = _db.collection('posts').doc();
@@ -58,7 +69,7 @@ class PostService {
       authorId: authorId,
       authorUsername: authorUsername.isNotEmpty
           ? authorUsername
-          : 'user_${authorId.substring(0, 6)}', // fallback for missing username
+          : 'user_${authorId.substring(0, 6)}',
       authorAvatarUrl: authorAvatarUrl,
       authorIsVerified: authorIsVerified,
       barangay: barangay,
@@ -70,7 +81,7 @@ class PostService {
       tags: tags,
       category: category,
       isUrgent: isUrgent,
-      urgentReasons: urgentReasons, // ← fixed
+      urgentReasons: urgentReasons,
       createdAt: DateTime.now(),
     );
     await docRef.set(post.toFirestore());
@@ -110,13 +121,11 @@ class PostService {
       }
 
       if (existingVote == voteType) {
-        // Toggle off — remove vote
         tx.delete(voteRef);
         tx.update(postRef, {
           '${voteType}votes': FieldValue.increment(-1),
         });
       } else {
-        // Switch vote or new vote
         if (existingVote != null) {
           tx.update(postRef, {
             '${existingVote}votes': FieldValue.increment(-1),
@@ -140,7 +149,7 @@ class PostService {
         .collection('tasks')
         .where('isUrgent', isEqualTo: true)
         .where('status', isEqualTo: 'open')
-        .orderBy('scheduledStart') // ← matches TaskModel field name
+        .orderBy('scheduledStart')
         .limit(10)
         .snapshots()
         .map((snap) => snap.docs
@@ -148,8 +157,7 @@ class PostService {
             .toList());
   }
 
-  // ─── User Posts Stream ────────────────────────────────────────────────────
-
+  // ─── User Posts Stream (single definition) ────────────────────────────────
   Stream<List<PostModel>> getPostsByUser(String userId) {
     return _db
         .collection('posts')
@@ -160,8 +168,7 @@ class PostService {
             snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList());
   }
 
-  // ─── Mock data for development (kept for fallback) ────────────────────────
-
+  // ─── Mock data for development ────────────────────────────────────────────
   static List<PostModel> get mockPosts => [
         PostModel(
           id: 'mock_1',
@@ -226,17 +233,4 @@ class PostService {
           isVerifiedUrgent: true,
         ),
       ];
-
-      // ─── User Posts ───────────────────────────────────────────
-
-    Stream<List<PostModel>> getPostsByUser(String userId) {
-    return _db
-        .collection('posts')
-        .where('authorId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList());
 }
-}
-

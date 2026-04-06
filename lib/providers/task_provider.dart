@@ -3,10 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/task_model.dart';
 import '../services/task_service.dart';
-import '../services/user_progress_service.dart';
 
 class TaskProvider extends ChangeNotifier {
   final TaskService _service;
+  String? _currentUserId;
 
   TaskProvider(this._service) {
     loadTasks();
@@ -29,8 +29,13 @@ class TaskProvider extends ChangeNotifier {
 
   List<TaskModel> get openTasks =>
       _tasks.where((t) => t.status == TaskStatus.open).toList();
-  List<TaskModel> get myTasks =>
-      _tasks.where((t) => t.status != TaskStatus.open).toList();
+
+  List<TaskModel> get myTasks => _tasks.where((t) => t.acceptedBy == _currentUserId).toList();
+
+  void setCurrentUser(String userId) {
+    _currentUserId = userId;
+    notifyListeners();
+  }
 
   Future<void> loadTasks({bool refresh = false}) async {
     if (_isLoading) return;
@@ -65,7 +70,6 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
     return true;
   }
-  
 
   void startTimer() {
     if (_timerRunning) return;
@@ -89,7 +93,6 @@ class TaskProvider extends ChangeNotifier {
     if (idx == -1) return;
     try {
       await _service.completeTask(taskId);
-      // Award points and increment jobsFinished
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
         'points': FieldValue.increment(points),
         'jobsFinished': FieldValue.increment(1),
@@ -103,9 +106,10 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Submit Verification ───────────────────────────────────────────────────
   Future<bool> submitVerification({
     required String taskId,
+    required String userId,
+    required int taskPoints,
     required String note,
     List<String> photos = const [],
   }) async {
@@ -113,9 +117,8 @@ class TaskProvider extends ChangeNotifier {
     if (idx == -1) return false;
     try {
       await _service.submitVerification(taskId: taskId, note: note, photos: photos);
-      // Award points after verification
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'points': FieldValue.increment(points),
+        'points': FieldValue.increment(taskPoints),
         'jobsFinished': FieldValue.increment(1),
       });
     } catch (_) {}

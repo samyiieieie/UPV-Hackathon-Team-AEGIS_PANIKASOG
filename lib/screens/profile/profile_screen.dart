@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../../models/user_model.dart';
@@ -34,6 +37,39 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
+  Future<void> _updateAvatar(BuildContext context) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (file == null) return;
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+
+    // Show loading
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Uploading...'), backgroundColor: AppColors.primary),
+    );
+
+    try {
+      final ref = FirebaseStorage.instance.ref().child('avatars/${user.uid}.jpg');
+      await ref.putFile(File(file.path));
+      final url = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'avatarUrl': url});
+      await context.read<AuthProvider>().refreshUser();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated!'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
@@ -54,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
       body: NestedScrollView(
         headerSliverBuilder: (_, __) => [
-          SliverToBoxAdapter(child: _ProfileHeader(user: user)),
+          SliverToBoxAdapter(child: _ProfileHeader(user: user, onAvatarTap: () => _updateAvatar(context))),
           SliverPersistentHeader(
             pinned: true,
             delegate: _TabBarDelegate(TabBar(
@@ -90,10 +126,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 }
 
-// Profile header (unchanged, but uses displayName)
+// Profile header with avatar upload callback
 class _ProfileHeader extends StatelessWidget {
   final UserModel user;
-  const _ProfileHeader({required this.user});
+  final VoidCallback onAvatarTap;
+  const _ProfileHeader({required this.user, required this.onAvatarTap});
 
   @override
   Widget build(BuildContext context) {
@@ -111,10 +148,16 @@ class _ProfileHeader extends StatelessWidget {
                       style: const TextStyle(fontFamily: 'Poppins', fontSize: 30, fontWeight: FontWeight.w700, color: AppColors.primary))
                   : null,
             ),
-            Positioned(bottom: 0, right: 0,
-              child: Container(width: 26, height: 26,
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                child: const Icon(Icons.camera_alt, color: AppColors.white, size: 14)),
+            Positioned(
+              bottom: 0, right: 0,
+              child: GestureDetector(
+                onTap: onAvatarTap,
+                child: Container(
+                  width: 26, height: 26,
+                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  child: const Icon(Icons.camera_alt, color: AppColors.white, size: 14),
+                ),
+              ),
             ),
           ]),
           const SizedBox(width: 16),
@@ -178,9 +221,11 @@ class _InfoTabState extends State<_InfoTab> {
         ],
       ),
     );
-    if (newValue != null && newValue != currentValue) {
+    if (newValue != null && newValue != currentValue && mounted) {
       await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({field: newValue});
-      await context.read<AuthProvider>().refreshUser();
+      if (mounted) {
+        await context.read<AuthProvider>().refreshUser();
+      }
     }
   }
 
@@ -317,147 +362,14 @@ class _StatRow extends StatelessWidget {
   );
 }
 
-// Tabs: Posts, Tasks, Reports, Rewards
-class _UserPostsTab extends StatelessWidget {
+// ─── Posts tab ─────────────────────────────────────────────────────────────
+class _UserPostsTab extends StatefulWidget {
   final String userId;
   const _UserPostsTab({required this.userId});
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<PostModel>>(
-      stream: PostService().getPostsByUser(userId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-        }
-        final posts = snapshot.data ?? [];
-        if (posts.isEmpty) {
-          return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.grid_on_outlined, size: 64, color: AppColors.borderGrey),
-            SizedBox(height: 12),
-            Text('No posts yet', style: AppTextStyles.bodySmall),
-          ]));
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 16),
-          itemCount: posts.length,
-          itemBuilder: (context, i) => PostCard(
-            post: posts[i],
-            currentUserId: userId,
-            userVote: null,
-            onUpvote: () {},
-            onDownvote: () {},
-          ),
-        );
-      },
-    );
-  }
-}
 
-class _UserTasksTab extends StatelessWidget {
-  final String userId;
-  const _UserTasksTab({required this.userId});
   @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<TaskModel>>(
-      stream: FirebaseFirestore.instance.collection('tasks')
-          .where('acceptedBy', isEqualTo: userId)
-          .snapshots()
-          .map((snap) => snap.docs.map((d) => TaskModel.fromFirestore(d)).toList()),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final tasks = snapshot.data!;
-        if (tasks.isEmpty) {
-          return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.assignment_outlined, size: 64, color: AppColors.borderGrey),
-            SizedBox(height: 12),
-            Text('No tasks taken', style: AppTextStyles.bodySmall),
-          ]));
-        }
-        return ListView.builder(
-          itemCount: tasks.length,
-          itemBuilder: (_, i) => ListTile(
-            title: Text(tasks[i].title, style: AppTextStyles.bodyMedium),
-            subtitle: Text('Status: ${tasks[i].status.name}', style: AppTextStyles.bodySmall),
-            trailing: Text('${tasks[i].points} pts', style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
-          ),
-        );
-      },
-    );
-  }
+  State<_UserPostsTab> createState() => _UserPostsTabState();
 }
-
-class _UserReportsTab extends StatelessWidget {
-  final String userId;
-  const _UserReportsTab({required this.userId});
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<ReportModel>>(
-      stream: FirebaseFirestore.instance.collection('reports')
-          .where('reportedBy', isEqualTo: userId)
-          .orderBy('reportedAt', descending: true)
-          .snapshots()
-          .map((snap) => snap.docs.map((d) => ReportModel.fromFirestore(d)).toList()),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final reports = snapshot.data!;
-        if (reports.isEmpty) {
-          return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.report_outlined, size: 64, color: AppColors.borderGrey),
-            SizedBox(height: 12),
-            Text('No reports submitted', style: AppTextStyles.bodySmall),
-          ]));
-        }
-        return ListView.builder(
-          itemCount: reports.length,
-          itemBuilder: (_, i) => ListTile(
-            title: Text(reports[i].title, style: AppTextStyles.bodyMedium),
-            subtitle: Text('${reports[i].hazardSubcategory} • ${reports[i].status.name}', style: AppTextStyles.bodySmall),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RewardsTab extends StatelessWidget {
-  final UserModel user;
-  const _RewardsTab({required this.user});
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const Text('Badges Earned', style: AppTextStyles.h2),
-        const SizedBox(height: 12),
-        if (user.badges.isEmpty)
-          const Text('No badges yet. Complete tasks to earn badges!', style: AppTextStyles.bodySmall)
-        else
-          Wrap(spacing: 12, children: user.badges.map((b) => Chip(label: Text(b))).toList()),
-        const SizedBox(height: 24),
-        const Text('Points History', style: AppTextStyles.h2),
-        const SizedBox(height: 12),
-        // Placeholder – you can implement a Firestore subcollection for points history
-        const Text('Coming soon', style: AppTextStyles.bodySmall),
-      ],
-    );
-  }
-}
-
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  const _TabBarDelegate(this.tabBar);
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
-      Container(color: AppColors.white, child: tabBar);
-  @override
-  bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => tabBar != oldDelegate.tabBar;
-}
-
-// ─── Post Tab ────────────────────────────────────────────
 
 class _UserPostsTabState extends State<_UserPostsTab> {
   late Stream<List<PostModel>> _stream;
@@ -505,4 +417,119 @@ class _UserPostsTabState extends State<_UserPostsTab> {
       },
     );
   }
+}
+
+class _EmptyTab extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  const _EmptyTab({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 64, color: AppColors.borderGrey),
+          const SizedBox(height: 12),
+          Text(label, style: AppTextStyles.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserTasksTab extends StatelessWidget {
+  final String userId;
+  const _UserTasksTab({required this.userId});
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<TaskModel>>(
+      stream: FirebaseFirestore.instance.collection('tasks')
+          .where('acceptedBy', isEqualTo: userId)
+          .snapshots()
+          .map((snap) => snap.docs.map((d) => TaskModel.fromFirestore(d)).toList()),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final tasks = snapshot.data!;
+        if (tasks.isEmpty) {
+          return const _EmptyTab(label: 'No tasks taken', icon: Icons.assignment_outlined);
+        }
+        return ListView.builder(
+          itemCount: tasks.length,
+          itemBuilder: (_, i) => ListTile(
+            title: Text(tasks[i].title, style: AppTextStyles.bodyMedium),
+            subtitle: Text('Status: ${tasks[i].status.name}', style: AppTextStyles.bodySmall),
+            trailing: Text('${tasks[i].points} pts', style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UserReportsTab extends StatelessWidget {
+  final String userId;
+  const _UserReportsTab({required this.userId});
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<ReportModel>>(
+      stream: FirebaseFirestore.instance.collection('reports')
+          .where('reportedBy', isEqualTo: userId)
+          .orderBy('reportedAt', descending: true)
+          .snapshots()
+          .map((snap) => snap.docs.map((d) => ReportModel.fromFirestore(d)).toList()),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final reports = snapshot.data!;
+        if (reports.isEmpty) {
+          return const _EmptyTab(label: 'No reports submitted', icon: Icons.report_outlined);
+        }
+        return ListView.builder(
+          itemCount: reports.length,
+          itemBuilder: (_, i) => ListTile(
+            title: Text(reports[i].title, style: AppTextStyles.bodyMedium),
+            subtitle: Text('${reports[i].hazardSubcategory} • ${reports[i].status.name}', style: AppTextStyles.bodySmall),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RewardsTab extends StatelessWidget {
+  final UserModel user;
+  const _RewardsTab({required this.user});
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text('Badges Earned', style: AppTextStyles.h2),
+        const SizedBox(height: 12),
+        if (user.badges.isEmpty)
+          const Text('No badges yet. Complete tasks to earn badges!', style: AppTextStyles.bodySmall)
+        else
+          Wrap(spacing: 12, children: user.badges.map((b) => Chip(label: Text(b))).toList()),
+        const SizedBox(height: 24),
+        const Text('Points History', style: AppTextStyles.h2),
+        const SizedBox(height: 12),
+        const Text('Coming soon', style: AppTextStyles.bodySmall),
+      ],
+    );
+  }
+}
+
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  const _TabBarDelegate(this.tabBar);
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      Container(color: AppColors.white, child: tabBar);
+  @override
+  bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => tabBar != oldDelegate.tabBar;
 }

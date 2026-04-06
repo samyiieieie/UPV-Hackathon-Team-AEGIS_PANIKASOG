@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/auth_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -22,7 +24,6 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          // Account section
           Container(
             color: AppColors.white,
             child: Column(
@@ -40,19 +41,17 @@ class SettingsScreen extends StatelessWidget {
                 _SettingsTile(
                   icon: Icons.lock_outline,
                   title: 'Change Password',
-                  onTap: () {},
+                  onTap: () => _showChangePasswordDialog(context),
                 ),
                 _SettingsTile(
                   icon: Icons.notifications_outlined,
                   title: 'Notifications',
-                  onTap: () {},
+                  onTap: () => _showComingSoon(context),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
-          // Privacy & Security section
           Container(
             color: AppColors.white,
             child: Column(
@@ -60,24 +59,23 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text('Privacy & Security', style: AppTextStyles.labelMedium),
+                  child: Text('Privacy & Security',
+                      style: AppTextStyles.labelMedium),
                 ),
                 _SettingsTile(
                   icon: Icons.privacy_tip_outlined,
                   title: 'Privacy Policy',
-                  onTap: () {},
+                  onTap: () => _launchURL('https://your-privacy-policy-url.com'),
                 ),
                 _SettingsTile(
                   icon: Icons.info_outline,
                   title: 'Terms of Service',
-                  onTap: () {},
+                  onTap: () => _launchURL('https://your-terms-url.com'),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
-          // App section
           Container(
             color: AppColors.white,
             child: Column(
@@ -90,19 +88,17 @@ class SettingsScreen extends StatelessWidget {
                 _SettingsTile(
                   icon: Icons.info_outline,
                   title: 'About',
-                  onTap: () {},
+                  onTap: () => _showAboutDialog(context),
                 ),
                 _SettingsTile(
                   icon: Icons.bug_report_outlined,
                   title: 'Report a Bug',
-                  onTap: () {},
+                  onTap: () => _showBugReportDialog(context),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
-          // Logout button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
@@ -128,7 +124,8 @@ class SettingsScreen extends StatelessWidget {
                               Navigator.pushNamed(context, '/landing');
                             }
                           },
-                          child: const Text('Logout', style: TextStyle(color: Colors.red)),
+                          child: const Text('Logout',
+                              style: TextStyle(color: Colors.red)),
                         ),
                       ],
                     ),
@@ -148,6 +145,135 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+void _showChangePasswordDialog(BuildContext context) {
+  final oldCtrl = TextEditingController();
+  final newCtrl = TextEditingController();
+  final confirmCtrl = TextEditingController();
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Change Password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: oldCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Current Password'),
+          ),
+          TextField(
+            controller: newCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'New Password'),
+          ),
+          TextField(
+            controller: confirmCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Confirm Password'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () async {
+            if (newCtrl.text != confirmCtrl.text) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Passwords do not match')),
+              );
+              return;
+            }
+            try {
+              await AuthService().changePassword(
+                currentPassword: oldCtrl.text,
+                newPassword: newCtrl.text,
+              );
+              // Use mounted check with the dialog context
+              if (Navigator.of(context).mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Password changed successfully!')),
+                );
+              }
+            } catch (e) {
+              if (Navigator.of(context).mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.toString())),
+                );
+              }
+            }
+          },
+          child: const Text('Update'),
+        ),
+      ],
+    ),
+  );
+}
+
+  void _showComingSoon(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Coming soon!')),
+    );
+  }
+
+  void _launchURL(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'PANIKASOG',
+      applicationVersion: '1.0.0',
+      applicationIcon: const Icon(Icons.warning_amber_rounded,
+          color: AppColors.primary),
+      children: const [
+        Text(
+            'PANIKASOG is a community disaster response and volunteer platform.'),
+      ],
+    );
+  }
+
+  void _showBugReportDialog(BuildContext context) {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Report a Bug'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 5,
+          decoration:
+              const InputDecoration(hintText: 'Describe the bug...'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Thank you! Bug report submitted.')),
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('Submit'),
+          ),
         ],
       ),
     );

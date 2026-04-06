@@ -5,6 +5,7 @@ import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../../models/task_model.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/auth_provider.dart';
 import 'task_detail_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -23,7 +24,10 @@ class _TasksScreenState extends State<TasksScreen>
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<TaskProvider>().loadTasks(refresh: true);
+      final provider = context.read<TaskProvider>();
+      final user = context.read<AuthProvider>().user;
+      if (user != null) provider.setCurrentUser(user.uid);
+      provider.loadTasks(refresh: true);
     });
   }
 
@@ -36,6 +40,7 @@ class _TasksScreenState extends State<TasksScreen>
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TaskProvider>();
+    final currentUserId = context.read<AuthProvider>().user?.uid;
 
     return Scaffold(
       backgroundColor: AppColors.lightGrey,
@@ -58,7 +63,10 @@ class _TasksScreenState extends State<TasksScreen>
               controller: _tabs,
               children: [
                 _TaskList(tasks: provider.openTasks, emptyMsg: 'No available tasks right now.'),
-                _TaskList(tasks: provider.myTasks, emptyMsg: 'You have not accepted any tasks yet.'),
+                _TaskList(
+                  tasks: provider.myTasks.where((t) => t.acceptedBy == currentUserId).toList(),
+                  emptyMsg: 'You have not accepted any tasks yet.',
+                ),
               ],
             ),
     );
@@ -115,7 +123,6 @@ class TaskCard extends StatelessWidget {
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 3))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Category + urgency
           Row(children: [
             _CategoryChip(label: task.categoryLabel),
             if (task.isUrgent) ...[
@@ -126,20 +133,14 @@ class TaskCard extends StatelessWidget {
             _StatusBadge(status: task.status),
           ]),
           const SizedBox(height: 10),
-
-          // Title
           Text(task.title, style: AppTextStyles.h3, maxLines: 2, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 6),
-
-          // Location
           Row(children: [
             const Icon(Icons.location_on_outlined, size: 14, color: AppColors.hintGrey),
             const SizedBox(width: 4),
             Text('${task.barangay}, ${task.city}', style: AppTextStyles.bodySmall),
           ]),
           const SizedBox(height: 10),
-
-          // Info row
           Row(children: [
             _InfoPill(icon: Icons.star_outline, label: '${task.points} pts', color: AppColors.primary),
             const SizedBox(width: 8),
@@ -151,8 +152,6 @@ class TaskCard extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 12),
-
-          // CTA
           SizedBox(
             width: double.infinity,
             height: 42,
