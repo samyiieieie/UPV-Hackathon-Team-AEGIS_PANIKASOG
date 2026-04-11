@@ -85,23 +85,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: double.infinity, height: 130,
-                decoration: BoxDecoration(
-                  color: AppColors.lightGrey,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.borderGrey),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.camera_alt_outlined, color: AppColors.hintGrey, size: 32),
-                    SizedBox(height: 8),
-                    Text('Take Photos', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: AppColors.hintGrey)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 4),
               _FieldLabel(label: 'Title'),
               TextFormField(
                 controller: _titleCtrl,
@@ -372,19 +356,27 @@ class _TagChip extends StatelessWidget {
   const _TagChip({required this.label, required this.onRemove});
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.all(1),
         decoration: BoxDecoration(
-          color: AppColors.chipBg,
+          gradient: const LinearGradient(
+            colors: [Color(0xFFDF0B33), Color(0xFFAB0857)],
+          ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary, fontSize: 12)),
-            const SizedBox(width: 4),
-            GestureDetector(onTap: onRemove, child: const Icon(Icons.close, size: 13, color: AppColors.primary)),
-          ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFECF3),
+            borderRadius: BorderRadius.circular(19),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary, fontSize: 12)),
+              const SizedBox(width: 4),
+              GestureDetector(onTap: onRemove, child: const Icon(Icons.close, size: 13, color: AppColors.primary)),
+            ],
+          ),
         ),
       );
 }
