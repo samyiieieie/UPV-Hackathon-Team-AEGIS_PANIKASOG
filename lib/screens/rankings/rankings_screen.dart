@@ -23,9 +23,10 @@ class _RankingsScreenState extends State<RankingsScreen> {
 
   bool _loading = true;
   List<LeaderboardEntry> _entries = [];
+  List<LeaderboardEntry> _communityEntries = [];
   String? _error;
   bool _isWeekly = true;
-  String _selectedFilter = 'All'; // 'All', 'Community', 'Individual'
+  String _selectedFilter = 'Individual'; // 'Individual', 'Community'
 
   @override
   void initState() {
@@ -37,23 +38,34 @@ class _RankingsScreenState extends State<RankingsScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       List<LeaderboardEntry> entries;
+      List<LeaderboardEntry> communityEntries;
+      
       if (_isWeekly) {
         entries = await _service.getWeeklyLeaderboard();
+        communityEntries = await _service.getWeeklyCommunitLeaderboard();
       } else {
         entries = await _service.getMonthlyLeaderboard();
+        communityEntries = await _service.getMonthlyCommunitLeaderboard();
       }
-      // Merge with mock data if real data is empty
+      
+      // Fallback to mock data if empty
       if (entries.isEmpty) {
         entries = _isWeekly
             ? LeaderboardEntry.mockDaily
             : LeaderboardEntry.mockMonthly;
       }
-      setState(() { _entries = entries; _loading = false; });
+      
+      setState(() { 
+        _entries = entries;
+        _communityEntries = communityEntries;
+        _loading = false; 
+      });
     } catch (e) {
       debugPrint('Leaderboard error: $e');
       setState(() {
         _error = 'Failed to load leaderboard.';
         _entries = LeaderboardEntry.mockDaily; // fallback
+        _communityEntries = [];
         _loading = false;
       });
     }
@@ -66,10 +78,21 @@ class _RankingsScreenState extends State<RankingsScreen> {
     }
   }
 
+  void _toggleFilter(String filter) {
+    if (_selectedFilter != filter) {
+      setState(() => _selectedFilter = filter);
+    }
+  }
+
+  List<LeaderboardEntry> _getDisplayEntries() {
+    return _selectedFilter == 'Community' ? _communityEntries : _entries;
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = context.watch<AuthProvider>().user;
     final currentUserId = currentUser?.uid ?? '';
+    final displayEntries = _getDisplayEntries();
 
     return Scaffold(
       backgroundColor: Color(0xFFFCF5F7),
@@ -159,15 +182,21 @@ class _RankingsScreenState extends State<RankingsScreen> {
                         padding: const EdgeInsets.fromLTRB(29, 24, 29, 0),
                         child: _buildToggleButtons(),
                       ),
-                      // ── Top 1-3 Section ─────────────────────────────
-                      if (_entries.length >= 3)
-                        _buildTopThreePodium(),
                       // ── Filter Chips ─────────────────────────────────
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(29, 24, 29, 0),
-                        child: _buildFilterChips(),
+                        padding: const EdgeInsets.fromLTRB(29, 16, 29, 0),
+                        child: Row(
+                          children: [
+                            _buildFilterChip('Individual', _selectedFilter == 'Individual'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Community', _selectedFilter == 'Community'),
+                          ],
+                        ),
                       ),
-                      // ── "Top 1-3" Label ──────────────────────────────
+                      // ── Top 1-3 Section ─────────────────────────────
+                      if (displayEntries.length >= 3)
+                        _buildTopThreePodium(displayEntries),
+                      // ── Top 1-3 Label ──────────────────────────────
                       Padding(
                         padding: const EdgeInsets.fromLTRB(29, 20, 29, 0),
                         child: Align(
@@ -183,24 +212,65 @@ class _RankingsScreenState extends State<RankingsScreen> {
                           ),
                         ),
                       ),
-                      // ── Leaderboard List ────────────────────────────
+                      // ── Top 1-3 Entries ────────────────────────────
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(29, 16, 29, 32),
+                        padding: const EdgeInsets.fromLTRB(29, 16, 29, 24),
                         child: Column(
-                          children: _entries
-                              .asMap()
-                              .entries
-                              .map((e) {
-                                final entry = e.value;
-                                final isCurrentUser = entry.userId == currentUserId;
+                          children: displayEntries
+                              .take(3)
+                              .map((entry) {
+                                final isCurrentUser = entry.userId == currentUserId && _selectedFilter == 'Individual';
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
-                                  child: _buildLeaderboardRow(entry, currentUserId, isCurrentUser),
+                                  child: _buildLeaderboardRow(entry, currentUserId, isCurrentUser, isHighlighted: true),
                                 );
                               })
                               .toList(),
                         ),
                       ),
+                      // ── Separator Line ─────────────────────────────
+                      if (displayEntries.length > 3)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(29, 0, 29, 24),
+                          child: Column(
+                            children: [
+                              Divider(
+                                color: _primaryGradientStart.withValues(alpha: 0.2),
+                                thickness: 2,
+                                height: 32,
+                              ),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Ranks 4+',
+                                  style: TextStyle(
+                                    fontFamily: 'Onest',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: _figmaPurple,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      // ── Rank 4+ Entries ────────────────────────────
+                      if (displayEntries.length > 3)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(29, 0, 29, 32),
+                          child: Column(
+                            children: displayEntries
+                                .skip(3)
+                                .map((entry) {
+                                  final isCurrentUser = entry.userId == currentUserId && _selectedFilter == 'Individual';
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: _buildLeaderboardRow(entry, currentUserId, isCurrentUser, isHighlighted: true),
+                                  );
+                                })
+                                .toList(),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -268,13 +338,13 @@ class _RankingsScreenState extends State<RankingsScreen> {
     );
   }
 
-  Widget _buildTopThreePodium() {
-    final entries = _entries.take(3).toList();
+  Widget _buildTopThreePodium(List<LeaderboardEntry> entries) {
+    final podiumEntries = entries.take(3).toList();
     // Reorder to show: 2nd, 1st, 3rd
     List<LeaderboardEntry> ordered = [];
-    if (entries.isNotEmpty) ordered.add(entries[0]); // 1st
-    if (entries.length >= 2) ordered.add(entries[1]); // 2nd
-    if (entries.length >= 3) ordered.add(entries[2]); // 3rd
+    if (podiumEntries.isNotEmpty) ordered.add(podiumEntries[0]); // 1st
+    if (podiumEntries.length >= 2) ordered.add(podiumEntries[1]); // 2nd
+    if (podiumEntries.length >= 3) ordered.add(podiumEntries[2]); // 3rd
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(29, 16, 29, 0),
@@ -434,23 +504,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
     );
   }
 
-  Widget _buildFilterChips() {
-    return Row(
-      children: [
-        _buildFilterChip('All', _selectedFilter == 'All'),
-        const SizedBox(width: 5),
-        _buildFilterChip('Community', _selectedFilter == 'Community'),
-        const SizedBox(width: 5),
-        _buildFilterChip('Individual', _selectedFilter == 'Individual'),
-      ],
-    );
-  }
-
   Widget _buildFilterChip(String label, bool isActive) {
     return GestureDetector(
-      onTap: () {
-        setState(() => _selectedFilter = label);
-      },
+      onTap: () => _toggleFilter(label),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -479,21 +535,29 @@ class _RankingsScreenState extends State<RankingsScreen> {
     );
   }
 
-  Widget _buildLeaderboardRow(LeaderboardEntry entry, String currentUserId, bool isCurrentUser) {
+  Widget _buildLeaderboardRow(LeaderboardEntry entry, String currentUserId, bool isCurrentUser, {bool isHighlighted = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 17.86, vertical: 12),
       decoration: BoxDecoration(
-        color: isCurrentUser ? Color(0xFFFFF5F7) : Colors.white,
+        color: isCurrentUser 
+            ? Color(0xFFFFF5F7) 
+            : isHighlighted 
+                ? Colors.white.withValues(alpha: 0.9)
+                : Colors.white,
         border: Border.all(
-          color: _primaryGradientStart,
-          width: 1.889,
+          color: isHighlighted ? _primaryGradientStart : const Color(0xFFE5E7EB),
+          width: isHighlighted ? 2 : 1.889,
         ),
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: isCurrentUser ? _primaryGradientStart.withValues(alpha: 0.15) : Color(0x1A000000),
-            blurRadius: isCurrentUser ? 10 : 6,
-            offset: Offset(0, isCurrentUser ? 6 : 4),
+            color: isCurrentUser 
+                ? _primaryGradientStart.withValues(alpha: 0.15) 
+                : isHighlighted
+                    ? _primaryGradientStart.withValues(alpha: 0.1)
+                    : Color(0x1A000000),
+            blurRadius: isCurrentUser ? 10 : isHighlighted ? 8 : 6,
+            offset: Offset(0, isCurrentUser ? 6 : isHighlighted ? 5 : 4),
           ),
         ],
       ),
