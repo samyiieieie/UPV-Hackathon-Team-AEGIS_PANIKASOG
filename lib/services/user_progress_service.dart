@@ -5,13 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class LevelSystem {
   static const levels = [
     (title: 'Community Member', expRequired: 0),
-    (title: 'Neighborhood Helper', expRequired: 100),
-    (title: 'Barangay Volunteer', expRequired: 300),
-    (title: 'Community Guardian', expRequired: 600),
-    (title: 'Disaster Responder', expRequired: 1000),
-    (title: 'Emergency Leader', expRequired: 1500),
-    (title: 'Community Hero', expRequired: 2200),
-    (title: 'Disaster Champion', expRequired: 3000),
+    (title: 'Neighborhood Helper', expRequired: 5000),
+    (title: 'Barangay Volunteer', expRequired: 8200),
+    (title: 'Community Guardian', expRequired: 8400),
+    (title: 'Disaster Responder', expRequired: 9000),
+    (title: 'Emergency Leader', expRequired: 10000),
+    (title: 'Community Hero', expRequired: 11000),
+    (title: 'Disaster Champion', expRequired: 12000),
   ];
 
   /// Returns current level title based on total EXP

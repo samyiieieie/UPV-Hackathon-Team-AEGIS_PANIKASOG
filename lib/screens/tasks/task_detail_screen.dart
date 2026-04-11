@@ -240,7 +240,7 @@ class TaskDetailScreen extends StatelessWidget {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => TaskInProgressScreen(task: task)),
+                          builder: (_) => TaskProgressScreen(task: task)),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
