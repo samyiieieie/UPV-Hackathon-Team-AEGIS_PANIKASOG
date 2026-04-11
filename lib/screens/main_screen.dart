@@ -149,10 +149,7 @@ class _BottomBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.zero,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.25),
@@ -260,12 +257,7 @@ class _NavItem extends StatelessWidget {
                       end: Alignment.centerRight,
                       colors: [Color(0xFFDF0B33), Color(0xFFAB0857)],
                     ),
-                    borderRadius: BorderRadius.only(
-                      topLeft:
-                          isLeftEdge ? const Radius.circular(20) : Radius.zero,
-                      topRight:
-                          isRightEdge ? const Radius.circular(20) : Radius.zero,
-                    ),
+                    borderRadius: BorderRadius.zero,
                   )
                 : null,
             child: Column(

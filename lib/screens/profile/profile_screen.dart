@@ -173,7 +173,7 @@ class _ProfileHeader extends StatelessWidget {
           ]),
           const SizedBox(width: 16),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(user.displayName, style: AppTextStyles.h2),
+            Text('${user.firstName} ${user.lastName}', style: AppTextStyles.h2),
             Text('@${user.username}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary)),
             if (user.address != null)
               Row(children: [
@@ -249,7 +249,33 @@ class _InfoTabState extends State<_InfoTab> {
         content: TextField(controller: controller, decoration: InputDecoration(hintText: 'New $field')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Save')),
+          TextButton(
+            onPressed: () async {
+              // For username, check availability
+              if (field == 'username') {
+                final trimmed = controller.text.trim();
+                if (trimmed.isEmpty) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username cannot be empty')));
+                  return;
+                }
+                try {
+                  final existing = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('username', isEqualTo: trimmed)
+                      .get();
+                  if (existing.docs.isNotEmpty && existing.docs.first.id != widget.user.uid) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username already taken')));
+                    return;
+                  }
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  return;
+                }
+              }
+              if (mounted) Navigator.pop(context, controller.text.trim());
+            },
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
@@ -257,6 +283,69 @@ class _InfoTabState extends State<_InfoTab> {
       await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({field: newValue});
       if (mounted) {
         await context.read<AuthProvider>().refreshUser();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$field updated!')));
+      }
+    }
+  }
+
+  Future<void> _editListField(String field, List<String> currentList) async {
+    final controller = TextEditingController();
+    final items = List<String>.from(currentList);
+
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (_, setState) => AlertDialog(
+          title: Text('Edit $field'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    hintText: 'Add new item',
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () {
+                        if (controller.text.isNotEmpty && !items.contains(controller.text.trim())) {
+                          setState(() => items.add(controller.text.trim()));
+                          controller.clear();
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: items.isEmpty
+                      ? const Center(child: Text('No items added'))
+                      : Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: items.map((item) => Chip(
+                            label: Text(item),
+                            onDeleted: () => setState(() => items.remove(item)),
+                          )).toList(),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context, items), child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null && result != currentList && mounted) {
+      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({field: result});
+      if (mounted) {
+        await context.read<AuthProvider>().refreshUser();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$field updated!')));
       }
     }
   }
@@ -277,9 +366,17 @@ class _InfoTabState extends State<_InfoTab> {
         _EditableField(label: 'Phone Number', value: user.phoneNumber ?? '—', icon: Icons.phone_outlined, onEdit: () => _editField('phoneNumber', user.phoneNumber ?? '')),
         const _EditableField(label: 'Password', value: '••••••••', icon: Icons.lock_outline, isPassword: true),
         const SizedBox(height: 8),
-        _ChipListField(label: 'Skills', values: user.skills),
+        _EditableChipListField(
+          label: 'Skills',
+          values: user.skills,
+          onEdit: () => _editListField('skills', user.skills),
+        ),
         const SizedBox(height: 12),
-        _ChipListField(label: 'Preferred Tasks', values: user.preferredTasks),
+        _EditableChipListField(
+          label: 'Preferred Tasks',
+          values: user.preferredTasks,
+          onEdit: () => _editListField('preferredTasks', user.preferredTasks),
+        ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
@@ -288,7 +385,16 @@ class _InfoTabState extends State<_InfoTab> {
             Row(children: [
               Text('Referral code', style: AppTextStyles.inputLabel.copyWith(color: AppColors.white.withValues(alpha: 0.8))),
               const Spacer(),
-              GestureDetector(onTap: () {}, child: const Icon(Icons.copy, color: AppColors.white, size: 18)),
+              GestureDetector(
+                onTap: () {
+                  if (user.referralCode != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Copied: ${user.referralCode}')),
+                    );
+                  }
+                },
+                child: const Icon(Icons.copy, color: AppColors.white, size: 18),
+              ),
             ]),
             const SizedBox(height: 6),
             Text(user.referralCode ?? '—', style: const TextStyle(fontFamily: 'Poppins', fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.white, letterSpacing: 3)),
@@ -344,10 +450,30 @@ class _ChipListField extends StatelessWidget {
   const _ChipListField({required this.label, required this.values});
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label, style: AppTextStyles.inputLabel),
+    const SizedBox(height: 6),
+    if (values.isEmpty)
+      const Text('Not set', style: AppTextStyles.bodySmall)
+    else
+      Wrap(spacing: 6, runSpacing: 4, children: values.map((v) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: AppColors.chipBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.primary.withValues(alpha: 0.4))),
+        child: Text(v, style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500)),
+      )).toList()),
+  ]);
+}
+
+class _EditableChipListField extends StatelessWidget {
+  final String label;
+  final List<String> values;
+  final VoidCallback onEdit;
+  const _EditableChipListField({required this.label, required this.values, required this.onEdit});
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Row(children: [
       Text(label, style: AppTextStyles.inputLabel),
       const Spacer(),
-      const Icon(Icons.edit_outlined, color: AppColors.primary, size: 16),
+      GestureDetector(onTap: onEdit, child: const Icon(Icons.edit_outlined, color: AppColors.primary, size: 16)),
     ]),
     const SizedBox(height: 6),
     if (values.isEmpty)
@@ -519,26 +645,107 @@ class _UserReportsTab extends StatelessWidget {
           .snapshots()
           .map((snap) => snap.docs.map((d) => ReportModel.fromFirestore(d)).toList()),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final reports = snapshot.data!;
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: AppColors.hintGrey, size: 48),
+                const SizedBox(height: 12),
+                Text('Error loading reports', style: AppTextStyles.bodySmall),
+                const SizedBox(height: 8),
+                Text(snapshot.error.toString(), style: AppTextStyles.bodySmall.copyWith(color: AppColors.hintGrey, fontSize: 10)),
+              ],
+            ),
+          );
+        }
+        final reports = snapshot.data ?? [];
         if (reports.isEmpty) {
           return const _EmptyTab(label: 'No reports submitted', icon: Icons.report_outlined);
         }
         return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 16),
           itemCount: reports.length,
-          itemBuilder: (_, i) => ListTile(
-            title: Text(reports[i].title, style: AppTextStyles.bodyMedium),
-            subtitle: Text('${reports[i].hazardSubcategory} • ${reports[i].status.name}', style: AppTextStyles.bodySmall),
+          itemBuilder: (_, i) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.borderGrey),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(reports[i].title, style: AppTextStyles.bodyMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(reports[i].status),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        reports[i].status.name.toUpperCase(),
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${reports[i].hazardSubcategory} • ${reports[i].barangay}',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
+  }
+
+  Color _getStatusColor(ReportStatus status) {
+    switch (status) {
+      case ReportStatus.verified:
+        return AppColors.success;
+      case ReportStatus.resolved:
+        return const Color(0xFF2196F3);
+      case ReportStatus.dismissed:
+        return AppColors.hintGrey;
+      case ReportStatus.pending:
+      default:
+        return AppColors.primary;
+    }
   }
 }
 
 class _RewardsTab extends StatelessWidget {
   final UserModel user;
   const _RewardsTab({required this.user});
+
+  Map<String, String> _getBadgeIcon(String badgeId) {
+    const iconMap = {
+      'first_task': ('🎯', 'First Responder'),
+      'five_tasks': ('🤝', 'Helping Hand'),
+      'twenty_tasks': ('⭐', 'Dedicated Volunteer'),
+      'fifty_tasks': ('🏆', 'Community Hero'),
+      'hundred_tasks': ('👑', 'Legendary Responder'),
+      'level_3': ('🌟', 'Rising Star'),
+      'level_5': ('🔥', 'Elite Volunteer'),
+      'level_8': ('💎', 'Champion'),
+      'points_500': ('💰', 'Point Collector'),
+      'points_1000': ('💎', 'Point Master'),
+    };
+    final (icon, label) = iconMap[badgeId] ?? ('🏅', 'Badge');
+    return {'icon': icon, 'label': label};
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -549,12 +756,96 @@ class _RewardsTab extends StatelessWidget {
         if (user.badges.isEmpty)
           const Text('No badges yet. Complete tasks to earn badges!', style: AppTextStyles.bodySmall)
         else
-          Wrap(spacing: 12, children: user.badges.map((b) => Chip(label: Text(b))).toList()),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: user.badges.map((badgeId) {
+              final badgeInfo = _getBadgeIcon(badgeId);
+              return Chip(
+                avatar: Text(badgeInfo['icon']!, style: const TextStyle(fontSize: 18)),
+                label: Text(badgeInfo['label']!),
+                backgroundColor: AppColors.chipBg,
+                labelStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
+              );
+            }).toList(),
+          ),
         const SizedBox(height: 24),
-        const Text('Points History', style: AppTextStyles.h2),
+        const Text('Partner Merchants & Rewards', style: AppTextStyles.h2),
         const SizedBox(height: 12),
-        const Text('Coming soon', style: AppTextStyles.bodySmall),
+        _MerchantRewardCard(
+          merchantName: 'Jollibee',
+          reward: 'Free Chicken Sandwich',
+          points: 150,
+          icon: '🍗',
+        ),
+        const SizedBox(height: 10),
+        _MerchantRewardCard(
+          merchantName: 'SM Malls',
+          reward: '₱500 Gift Card',
+          points: 500,
+          icon: '🛍️',
+        ),
+        const SizedBox(height: 10),
+        _MerchantRewardCard(
+          merchantName: 'Caltex',
+          reward: '2L Free Gas',
+          points: 300,
+          icon: '⛽',
+        ),
+        const SizedBox(height: 10),
+        _MerchantRewardCard(
+          merchantName: 'Pharmacy',
+          reward: 'First Aid Kit',
+          points: 200,
+          icon: '🏥',
+        ),
       ],
+    );
+  }
+}
+
+class _MerchantRewardCard extends StatelessWidget {
+  final String merchantName;
+  final String reward;
+  final int points;
+  final String icon;
+
+  const _MerchantRewardCard({
+    required this.merchantName,
+    required this.reward,
+    required this.points,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.borderGrey),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 32)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(merchantName, style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(reward, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey)),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(color: AppColors.chipBg, borderRadius: BorderRadius.circular(8)),
+            child: Text('$points pts', style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
     );
   }
 }
