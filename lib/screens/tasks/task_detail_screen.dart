@@ -1,15 +1,12 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart' as geo;
-import 'package:firebase_storage/firebase_storage.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../../models/task_model.dart';
@@ -29,9 +26,19 @@ class TaskDetailScreen extends StatelessWidget {
     final isOpen = task.status == TaskStatus.open;
     final userId = context.watch<AuthProvider>().user?.uid ?? '';
     final alreadyAccepted = task.isAcceptedBy(userId);
+    final totalVolunteers = task.volunteersNeeded == 0 ? 1 : task.volunteersNeeded;
+    final volunteerProgress =
+        (task.volunteersAccepted / totalVolunteers).clamp(0.0, 1.0);
+    final taskMinutes =
+        task.scheduledEnd.difference(task.scheduledStart).inMinutes.abs();
+    final elapsedMinutes = DateTime.now().difference(task.scheduledStart).inMinutes;
+    final timeProgress = taskMinutes == 0
+        ? 0.0
+        : (elapsedMinutes / taskMinutes).clamp(0.0, 1.0);
+    final detailSteps = _buildTaskSteps(task.description);
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: const Color(0xFFFFF5F7),
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
@@ -40,148 +47,291 @@ class TaskDetailScreen extends StatelessWidget {
               color: AppColors.primary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Task Detail', style: AppTextStyles.h2),
+        title: Text(
+          'Task Detail',
+          style: AppTextStyles.h1.copyWith(color: const Color(0xFF520052)),
+        ),
       ),
       body: SingleChildScrollView(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Hero image / placeholder
-          Container(
-            width: double.infinity,
-            height: 200,
-            color: AppColors.lightGrey,
-            child: task.imageUrl != null
-                ? Image.network(task.imageUrl!, fit: BoxFit.cover)
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(_categoryIcon(task.category),
-                          size: 64, color: AppColors.borderGrey),
-                      const SizedBox(height: 8),
-                      Text(task.categoryLabel, style: AppTextStyles.bodySmall),
-                    ],
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Wrap(
-                  spacing: 6,
-                  children: task.tags.map((t) => _TagChip(label: t)).toList()),
-              const SizedBox(height: 12),
-              Text(task.title, style: AppTextStyles.h1),
-              const SizedBox(height: 8),
-              _InfoRow(
-                  icon: Icons.location_on_outlined,
-                  text: '${task.barangay}, ${task.city}'),
-              const SizedBox(height: 4),
-              _InfoRow(
-                  icon: Icons.access_time,
-                  text:
-                      '${DateFormat('MMM d, yyyy • h:mma').format(task.scheduledStart)} – ${DateFormat('h:mma').format(task.scheduledEnd)}'),
-              const SizedBox(height: 4),
-              _InfoRow(
-                  icon: Icons.people_outline,
-                  text:
-                      '${task.volunteersAccepted} / ${task.volunteersNeeded} volunteers'),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.chipBg,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.emoji_events,
-                      color: AppColors.primary, size: 32),
-                  const SizedBox(width: 12),
-                  Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Earn ${task.points} points',
-                            style: AppTextStyles.h3
-                                .copyWith(color: AppColors.primary)),
-                        const Text('for completing this task',
-                            style: AppTextStyles.bodySmall),
-                      ]),
-                ]),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFDF0B33), width: 1.6),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  )
+                ],
               ),
-              const SizedBox(height: 16),
-              const Text('Description', style: AppTextStyles.h3),
-              const SizedBox(height: 6),
-              Text(task.description, style: AppTextStyles.bodyMedium),
-              const SizedBox(height: 28),
-
-              // Action buttons
-              if (alreadyAccepted) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => TaskProgressScreen(task: task))),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28))),
-                    child: const Text('Continue Task',
-                        style: AppTextStyles.labelLarge),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                    width: 46,
+                    height: 61,
+                    alignment: Alignment.center,
+                    child: Icon(_categoryIcon(task.category),
+                        size: 40, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      task.title,
+                      style: AppTextStyles.h2.copyWith(
+                        color: const Color(0xFF520052),
+                        fontSize: 34 / 2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ]),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _DetailMetaChip(
+                      icon: Icons.location_on,
+                      text: '${task.barangay}, ${task.city}',
+                    ),
+                    _DetailMetaChip(
+                      icon: Icons.access_time_filled,
+                      text: 'Posted ${_postedAgo(task.scheduledStart)}',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _TagChip(label: task.categoryLabel),
+                    ...task.tags.take(2).map((t) => _TagChip(label: t)),
+                    if (task.tags.length > 2)
+                      _TagChip(label: '+${task.tags.length - 2}'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  const Icon(Icons.workspace_premium,
+                      color: AppColors.primary, size: 24),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${task.points} points',
+                    style: AppTextStyles.h3.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  CircleAvatar(
+                    radius: 10,
+                    backgroundColor: const Color(0xFF947FFF),
+                    child: Text(
+                      _initials(task.createdBy),
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    task.createdBy.isEmpty ? 'Task Organizer' : task.createdBy,
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.textDark,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 6),
+                Text(
+                  task.description,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textDark,
+                    fontSize: 12,
+                    height: 1.35,
                   ),
                 ),
-              ] else if (isOpen) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () => _acceptTask(context),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28))),
-                    child: const Text('Accept Task',
-                        style: AppTextStyles.labelLarge),
+                const SizedBox(height: 8),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                    borderRadius: BorderRadius.circular(6),
                   ),
+                  child: Row(children: [
+                    const Expanded(
+                      child: Text('Community Boost',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                    const Icon(Icons.north, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 2),
+                    Text('${1000 + (task.points * 2)}',
+                        style: const TextStyle(fontSize: 12)),
+                  ]),
                 ),
                 const SizedBox(height: 12),
+                Text(
+                  'What needs to be done:',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ...List.generate(
+                  detailSteps.length,
+                  (index) => Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      '${index + 1}. ${detailSteps[index]}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textDark,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _TaskMetricProgress(
+                  label: 'Volunteers',
+                  valueLabel: '${task.volunteersAccepted}/${task.volunteersNeeded}',
+                  hint:
+                      'Only ${task.volunteersNeeded - task.volunteersAccepted > 0 ? task.volunteersNeeded - task.volunteersAccepted : 0} volunteers left!',
+                  progress: volunteerProgress,
+                  icon: Icons.person,
+                ),
+                const SizedBox(height: 8),
+                _TaskMetricProgress(
+                  label: DateFormat('MMMM d, yyyy - h:mma').format(task.scheduledStart),
+                  valueLabel: _remainingDuration(task.scheduledEnd),
+                  hint: 'Only ${_remainingDuration(task.scheduledEnd)} left!',
+                  progress: timeProgress,
+                  icon: Icons.calendar_month,
+                ),
+              ]),
+            ),
+            const SizedBox(height: 20),
+            if (alreadyAccepted || !isOpen)
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFDF0B33), Color(0xFFAB0857)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => TaskProgressScreen(task: task)),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      alreadyAccepted ? 'Continue Task' : 'View Progress',
+                      style: AppTextStyles.labelLarge.copyWith(fontSize: 16),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Column(children: [
                 SizedBox(
                   width: double.infinity,
                   height: 52,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFDF0B33), Color(0xFFAB0857)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () => _acceptTask(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text('Accept Task',
+                          style: AppTextStyles.labelLarge),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
                   child: OutlinedButton(
                     onPressed: () => _navigateToMap(context),
                     style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28))),
-                    child: Text('View on Map',
-                        style: AppTextStyles.labelLarge
-                            .copyWith(color: AppColors.primary)),
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      'View on Map',
+                      style: AppTextStyles.labelLarge
+                          .copyWith(color: AppColors.primary),
+                    ),
                   ),
                 ),
-              ] else ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => TaskProgressScreen(task: task))),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28))),
-                    child: const Text('View Progress',
-                        style: AppTextStyles.labelLarge),
-                  ),
-                ),
-              ],
-            ]),
-          ),
-        ]),
+              ]),
+          ]),
+        ),
       ),
     );
+  }
+
+  List<String> _buildTaskSteps(String description) {
+    final parts = description
+        .split(RegExp(r'[.!?]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (parts.isNotEmpty) {
+      return parts.take(3).toList();
+    }
+    return const [
+      'Coordinate with volunteers in the assigned area.',
+      'Complete the task objectives safely and responsibly.',
+      'Report outcomes and submit required proof of work.',
+    ];
+  }
+
+  String _initials(String value) {
+    if (value.trim().isEmpty) return 'TG';
+    final words = value.trim().split(RegExp(r'\s+'));
+    if (words.length == 1) {
+      return words.first.substring(0, words.first.length >= 2 ? 2 : 1).toUpperCase();
+    }
+    final first = words.first.isNotEmpty ? words.first[0] : 'T';
+    final last = words.last.isNotEmpty ? words.last[0] : 'G';
+    return '$first$last'.toUpperCase();
   }
 
   Future<void> _acceptTask(BuildContext context) async {
@@ -480,48 +630,12 @@ class TaskProgressScreen extends StatefulWidget {
 }
 
 class _TaskProgressScreenState extends State<TaskProgressScreen> {
-  final List<String> _uploadedPhotoUrls = [];
-  bool _uploadingPhoto = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskProvider>().startTimer();
     });
-  }
-
-  Future<void> _logProgressPhoto() async {
-    setState(() => _uploadingPhoto = true);
-    try {
-      final picker = ImagePicker();
-      final file =
-          await picker.pickImage(source: ImageSource.camera, imageQuality: 75);
-      if (file == null) {
-        if (mounted) setState(() => _uploadingPhoto = false);
-        return;
-      }
-
-      final userId = context.read<AuthProvider>().user?.uid ?? 'unknown';
-      final ref = FirebaseStorage.instance.ref(
-          'task_progress/${widget.task.id}/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      await ref.putFile(File(file.path));
-      final url = await ref.getDownloadURL();
-      if (mounted) setState(() => _uploadedPhotoUrls.add(url));
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('📷 Progress photo logged!'),
-            backgroundColor: AppColors.success));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Photo upload failed: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _uploadingPhoto = false);
-    }
   }
 
   Future<void> _submitCompletion() async {
@@ -533,7 +647,7 @@ class _TaskProgressScreenState extends State<TaskProgressScreen> {
           userId: userId,
           taskPoints: widget.task.points,
           note: 'Task completed',
-          photos: _uploadedPhotoUrls,
+          photos: const [],
         );
     if (!mounted) return;
     Navigator.pushReplacement(context,
@@ -593,35 +707,7 @@ class _TaskProgressScreenState extends State<TaskProgressScreen> {
           ),
           const SizedBox(height: 12),
           const Text('TIME ELAPSED', style: AppTextStyles.labelSmall),
-          if (_uploadedPhotoUrls.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text('${_uploadedPhotoUrls.length} photo(s) logged ✓',
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.success)),
-          ],
           const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _uploadingPhoto ? null : _logProgressPhoto,
-              icon: _uploadingPhoto
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          color: AppColors.white, strokeWidth: 2))
-                  : const Icon(Icons.camera_alt_outlined, size: 20),
-              label: Text(
-                  _uploadingPhoto ? 'Uploading...' : 'Log Progress Photo',
-                  style: AppTextStyles.labelLarge),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28))),
-            ),
-          ),
-          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             height: 52,
@@ -965,7 +1051,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final _locationCtrl = TextEditingController(text: 'La Paz, Iloilo City');
   TaskCategory _category = TaskCategory.emergencyResponse;
   final List<String> _tags = [];
-  final List<File> _photos = [];
   final FocusNode _locationFocus = FocusNode();
   bool _showMap = false;
   GoogleMapController? _mapController;
@@ -1142,43 +1227,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           padding: const EdgeInsets.all(20),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            GestureDetector(
-              onTap: _pickPhoto,
-              child: Container(
-                width: double.infinity,
-                height: 120,
-                decoration: BoxDecoration(
-                    color: AppColors.lightGrey,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.borderGrey)),
-                child: _photos.isEmpty
-                    ? const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                            Icon(Icons.camera_alt_outlined,
-                                color: AppColors.hintGrey, size: 30),
-                            SizedBox(height: 6),
-                            Text('Take Photos',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 13,
-                                    color: AppColors.hintGrey)),
-                          ])
-                    : ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.all(8),
-                        itemCount: _photos.length,
-                        itemBuilder: (_, i) => Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              width: 100,
-                              child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.file(_photos[i],
-                                      fit: BoxFit.cover)),
-                            )),
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 4),
             const _FieldLabel(label: 'Title'),
             TextFormField(
                 controller: _titleCtrl,
@@ -1413,13 +1462,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
-  Future<void> _pickPhoto() async {
-    final picker = ImagePicker();
-    final f =
-        await picker.pickImage(source: ImageSource.camera, imageQuality: 80);
-    if (f != null && mounted) setState(() => _photos.add(File(f.path)));
-  }
-
   Future<void> _submit(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
@@ -1519,6 +1561,107 @@ class _VerificationChecklist extends StatelessWidget {
   }
 }
 
+class _DetailMetaChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _DetailMetaChip({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTextStyles.bodySmall.copyWith(
+      fontSize: 9,
+      color: AppColors.primary,
+      fontWeight: FontWeight.w500,
+    );
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 10, color: AppColors.primary),
+      const SizedBox(width: 2),
+      Text(text, style: style),
+    ]);
+  }
+}
+
+class _TaskMetricProgress extends StatelessWidget {
+  final String label;
+  final String valueLabel;
+  final String hint;
+  final double progress;
+  final IconData icon;
+  const _TaskMetricProgress({
+    required this.label,
+    required this.valueLabel,
+    required this.hint,
+    required this.progress,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = AppTextStyles.bodySmall.copyWith(
+      fontSize: 9,
+      color: AppColors.primary,
+      fontWeight: FontWeight.w500,
+    );
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Icon(icon, size: 11, color: AppColors.primary),
+        const SizedBox(width: 3),
+        Expanded(child: Text(label, style: labelStyle)),
+        Text(valueLabel, style: labelStyle),
+      ]),
+      const SizedBox(height: 4),
+      Container(
+        height: 15,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: LayoutBuilder(
+          builder: (_, constraints) => Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: constraints.maxWidth * progress,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF510152), Color(0xFFA6029E)],
+                ),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(hint, style: labelStyle.copyWith(fontSize: 8)),
+    ]);
+  }
+}
+
+String _postedAgo(DateTime date) {
+  final diff = DateTime.now().difference(date);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inHours < 1) return '${diff.inMinutes} mins. ago';
+  if (diff.inDays < 1) return '${diff.inHours} hours ago';
+  return '${diff.inDays} days ago';
+}
+
+String _remainingDuration(DateTime end) {
+  final diff = end.difference(DateTime.now());
+  if (diff.isNegative) return 'Ended';
+  if (diff.inHours >= 1) return '${diff.inHours} hours';
+  return '${diff.inMinutes} mins';
+}
+
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -1539,24 +1682,32 @@ class _TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.all(1),
         decoration: BoxDecoration(
-            color: AppColors.chipBg,
-            borderRadius: BorderRadius.circular(20),
-            border:
-                Border.all(color: AppColors.primary.withValues(alpha: 0.4))),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(label,
-              style: AppTextStyles.labelMedium
-                  .copyWith(color: AppColors.primary, fontSize: 12)),
-          if (onRemove != null) ...[
-            const SizedBox(width: 4),
-            GestureDetector(
-                onTap: onRemove,
-                child: const Icon(Icons.close,
-                    size: 13, color: AppColors.primary)),
-          ],
-        ]),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFDF0B33), Color(0xFFAB0857)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFECF3),
+            borderRadius: BorderRadius.circular(19),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(label,
+                style: AppTextStyles.labelMedium
+                    .copyWith(color: AppColors.primary, fontSize: 12)),
+            if (onRemove != null) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                  onTap: onRemove,
+                  child: const Icon(Icons.close,
+                      size: 13, color: AppColors.primary)),
+            ],
+          ]),
+        ),
       );
 }
 

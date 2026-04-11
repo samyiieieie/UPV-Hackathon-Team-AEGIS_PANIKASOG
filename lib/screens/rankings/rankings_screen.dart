@@ -5,6 +5,8 @@ import '../../core/constants/text_styles.dart';
 import '../../models/leaderboard_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/leaderboard_service.dart';
+import '../profile/profile_screen.dart';
+import '../settings/settings_screen.dart';
 
 class RankingsScreen extends StatefulWidget {
   const RankingsScreen({super.key});
@@ -74,6 +76,52 @@ class _RankingsScreenState extends State<RankingsScreen>
 
     return Scaffold(
       backgroundColor: AppColors.lightGrey,
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            const Icon(Icons.cyclone, color: Color(0xFFC2185B), size: 28),
+            const SizedBox(width: 8),
+            Text(
+              'PANIKASOG',
+              style: AppTextStyles.h1.copyWith(
+                fontSize: 20,
+                color: const Color(0xFFC2185B),
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+            child: CircleAvatar(
+              radius: 16,
+              backgroundImage: NetworkImage(
+                  currentUser?.avatarUrl ?? 'https://via.placeholder.com/150'),
+              backgroundColor: Colors.grey[300],
+            ),
+          ),
+          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.black87, size: 26),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: NestedScrollView(
         headerSliverBuilder: (_, __) => [
           SliverAppBar(

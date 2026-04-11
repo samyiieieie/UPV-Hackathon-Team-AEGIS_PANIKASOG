@@ -477,21 +477,28 @@ class _UserTasksTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<TaskModel>>(
-      stream: FirebaseFirestore.instance.collection('tasks')
-          .where('acceptedBy', isEqualTo: userId)
+      stream: FirebaseFirestore.instance
+          .collection('tasks')
+          .where('status', isEqualTo: TaskStatus.verified.name)
           .snapshots()
-          .map((snap) => snap.docs.map((d) => TaskModel.fromFirestore(d)).toList()),
+          .map((snap) => snap.docs
+              .map((d) => TaskModel.fromFirestore(d))
+              .where((task) => task.isAcceptedBy(userId))
+              .toList()),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final tasks = snapshot.data!;
         if (tasks.isEmpty) {
-          return const _EmptyTab(label: 'No tasks taken', icon: Icons.assignment_outlined);
+          return const _EmptyTab(label: 'No verified tasks yet', icon: Icons.verified_outlined);
         }
         return ListView.builder(
           itemCount: tasks.length,
           itemBuilder: (_, i) => ListTile(
             title: Text(tasks[i].title, style: AppTextStyles.bodyMedium),
-            subtitle: Text('Status: ${tasks[i].status.name}', style: AppTextStyles.bodySmall),
+            subtitle: Text(
+              'Verified • ${tasks[i].barangay}, ${tasks[i].city}',
+              style: AppTextStyles.bodySmall,
+            ),
             trailing: Text('${tasks[i].points} pts', style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
           ),
         );
