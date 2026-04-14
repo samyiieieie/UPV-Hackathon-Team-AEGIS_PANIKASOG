@@ -142,11 +142,27 @@ class ReportModel {
       city: d['city'] ?? '',
       latitude: (d['latitude'] as num?)?.toDouble(),
       longitude: (d['longitude'] as num?)?.toDouble(),
-      reportedAt: (d['reportedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      // reportedAt: (d['reportedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      reportedAt: _parseDate(d['reportedAt']),
       status: _statusFromString(d['status']),
       imageUrls: List<String>.from(d['imageUrls'] ?? []),
       upvotes: d['upvotes'] ?? 0,
     );
+  }
+
+  static DateTime _parseDate(dynamic date) {
+    if (date is Timestamp) return date.toDate();
+
+    if (date is Map) {
+      final seconds = date['_seconds'] ?? date['seconds'];
+      if (seconds != null) {
+        return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+      }
+    }
+
+    if (date is String) return DateTime.tryParse(date) ?? DateTime.now();
+
+    return DateTime.now();
   }
 
   Map<String, dynamic> toFirestore() => {
