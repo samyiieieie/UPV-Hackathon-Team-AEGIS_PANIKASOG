@@ -696,12 +696,12 @@ class _TagsSectionState extends State<_TagsSection> {
             ),
           ),
         ),
-        if (tags.isNotEmpty) ...[
+        if (widget.tags.isNotEmpty) ...[
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 6,
-            children: tags.map((tag) {
+            children: widget.tags.map((tag) {
               return Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -723,7 +723,7 @@ class _TagsSectionState extends State<_TagsSection> {
                     ),
                     const SizedBox(width: 6),
                     GestureDetector(
-                      onTap: () => onRemove(tag),
+                      onTap: () => widget.onRemove(tag),
                       child: const Icon(Icons.close,
                           size: 14, color: AppColors.primary),
                     ),
