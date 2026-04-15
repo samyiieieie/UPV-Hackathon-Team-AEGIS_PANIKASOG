@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
+import '../../core/constants/prohibited_keywords.dart';
 import '../../models/task_model.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -29,6 +30,14 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   bool _submitting = false;
   DateTime _startDate = DateTime.now().add(const Duration(hours: 2));
   DateTime _endDate = DateTime.now().add(const Duration(hours: 6));
+
+  String _filterText(String text) {
+    String result = text;
+    for (String keyword in prohibitedKeywords) {
+      result = result.replaceAll(RegExp(keyword, caseSensitive: false), '');
+    }
+    return result;
+  }
 
   @override
   void dispose() {
@@ -91,6 +100,13 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 controller: _titleCtrl,
                 style: AppTextStyles.inputText,
                 decoration: const InputDecoration(hintText: 'e.g. Medical Assistance for Injured...'),
+                onChanged: (value) {
+                  String filtered = _filterText(value);
+                  if (filtered != value) {
+                    _titleCtrl.text = filtered;
+                    _titleCtrl.selection = TextSelection.collapsed(offset: filtered.length);
+                  }
+                },
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null,
               ),
               const SizedBox(height: 16),
@@ -100,6 +116,13 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 maxLines: 3,
                 style: AppTextStyles.inputText,
                 decoration: const InputDecoration(hintText: 'Describe the task in detail...'),
+                onChanged: (value) {
+                  String filtered = _filterText(value);
+                  if (filtered != value) {
+                    _descCtrl.text = filtered;
+                    _descCtrl.selection = TextSelection.collapsed(offset: filtered.length);
+                  }
+                },
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Description is required' : null,
               ),
               const SizedBox(height: 16),
@@ -120,6 +143,13 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 controller: _tagCtrl,
                 style: AppTextStyles.inputText,
                 textInputAction: TextInputAction.done,
+                onChanged: (value) {
+                  String filtered = _filterText(value);
+                  if (filtered != value) {
+                    _tagCtrl.text = filtered;
+                    _tagCtrl.selection = TextSelection.collapsed(offset: filtered.length);
+                  }
+                },
                 onFieldSubmitted: (v) {
                   if (v.trim().isNotEmpty) {
                     setState(() {
@@ -156,6 +186,13 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
               TextFormField(
                 controller: _locationCtrl,
                 style: AppTextStyles.inputText,
+                onChanged: (value) {
+                  String filtered = _filterText(value);
+                  if (filtered != value) {
+                    _locationCtrl.text = filtered;
+                    _locationCtrl.selection = TextSelection.collapsed(offset: filtered.length);
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'e.g., La Paz, Iloilo City',
                   suffixIcon: IconButton(
@@ -176,7 +213,14 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                           initialValue: _volunteers.toString(),
                           style: AppTextStyles.inputText,
                           keyboardType: TextInputType.number,
-                          onChanged: (v) => _volunteers = int.tryParse(v) ?? 1,
+                          onChanged: (value) {
+                            String filtered = _filterText(value);
+                            if (filtered != value) {
+                              // For numbers, perhaps don't filter, but since it's text, filter anyway
+                              // But to avoid issues, maybe skip for numbers
+                            }
+                            _volunteers = int.tryParse(filtered) ?? 1;
+                          },
                           decoration: const InputDecoration(),
                         ),
                       ],
@@ -192,7 +236,13 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                           initialValue: _points.toString(),
                           style: AppTextStyles.inputText,
                           keyboardType: TextInputType.number,
-                          onChanged: (v) => _points = int.tryParse(v) ?? 100,
+                          onChanged: (value) {
+                            String filtered = _filterText(value);
+                            if (filtered != value) {
+                              // Skip filtering for numbers
+                            }
+                            _points = int.tryParse(filtered) ?? 100;
+                          },
                           decoration: const InputDecoration(),
                         ),
                       ],
